@@ -57,43 +57,21 @@ export interface CommissionAssignOptions {
 }
 
 const STORAGE_KEYS = {
-  STORE: 'vaveiculos_store_v3',
-  FINANCIERS: 'vaveiculos_financiers_v3',
-  SALESPEOPLE: 'vaveiculos_salespeople_v3',
-  USERS: 'vaveiculos_users_v3',
-  TEMPLATES: 'vaveiculos_templates_v3',
-  OWNERS: 'vaveiculos_owners_v3',
-  VEHICLES: 'vaveiculos_vehicles_v3',
-  PUBLIC_VEHICLES: 'vaveiculos_public_vehicles_v3',
-  SALES: 'vaveiculos_sales_v3',
-  ACTIVE_ROLE: 'vaveiculos_active_role_v3',
-  ACTIVE_SELLER_ID: 'vaveiculos_active_seller_id_v3',
-  PENDING_SYNC: 'vaveiculos_pending_sync_v3'
+  STORE: 'vaveiculos_store_v4',
+  FINANCIERS: 'vaveiculos_financiers_v4',
+  SALESPEOPLE: 'vaveiculos_salespeople_v4',
+  USERS: 'vaveiculos_users_v4',
+  TEMPLATES: 'vaveiculos_templates_v4',
+  OWNERS: 'vaveiculos_owners_v4',
+  VEHICLES: 'vaveiculos_vehicles_v4',
+  PUBLIC_VEHICLES: 'vaveiculos_public_vehicles_v4',
+  SALES: 'vaveiculos_sales_v4',
+  ACTIVE_ROLE: 'vaveiculos_active_role_v4',
+  ACTIVE_SELLER_ID: 'vaveiculos_active_seller_id_v4',
+  PENDING_SYNC: 'vaveiculos_pending_sync_v4'
 };
 
-const AUDIT_STORAGE_KEY = 'vaveiculos_audit_logs_v3';
-
-const LEGACY_DEMO_IDS = new Set<string>([
-  'vend_carlos',
-  'vend_juliana',
-  'vend_roberto',
-  'owner_marcos',
-  'owner_alessandra',
-  'owner_lucas',
-  'owner_renata',
-  'veh_bmw320i',
-  'veh_compass',
-  'veh_corolla_repasse',
-  'veh_yamaha_mt07',
-  'veh_hilux_srx',
-  'veh_pulse_audace',
-  'veh_civic_touring',
-  'veh_tcross',
-  'veh_onix_repasse',
-  'sale_civic_01',
-  'sale_onix_02',
-  'sale_tcross_03'
-]);
+const AUDIT_STORAGE_KEY = 'vaveiculos_audit_logs_v4';
 
 // Fallback resiliente em memória caso o navegador atinja QuotaExceededError (~5 MB) ou bloqueie Web Storage
 const memoryFallbackStore = new Map<string, string>();
@@ -1016,29 +994,30 @@ export const storageService = {
       ]);
 
       if (remoteUsers.length > 0) {
-        const cleanRemoteUsers = remoteUsers.filter(u => !LEGACY_DEMO_IDS.has(u.id));
         const mergedUsers = mergeEntitiesByFreshness(
           STORAGE_KEYS.USERS,
-          this.getUsers().filter(u => !LEGACY_DEMO_IDS.has(u.id)),
-          cleanRemoteUsers,
+          this.getUsers(),
+          remoteUsers,
           'users'
         );
         this.saveUsers(mergedUsers.length > 0 ? mergedUsers : SEED_USERS);
       } else {
         // Primeiro acesso ao novo banco Firestore: provisiona automaticamente o Admin Master na nuvem
-        const initialUsers = this.getUsers().filter(u => !LEGACY_DEMO_IDS.has(u.id));
+        const initialUsers = this.getUsers();
         await Promise.all(initialUsers.map(u => firebaseDb.saveUser(u).catch(() => false)));
       }
 
       if (remoteSalespeople.length > 0) {
-        const cleanRemoteSp = remoteSalespeople.filter(s => !LEGACY_DEMO_IDS.has(s.id));
         const mergedSalespeople = mergeEntitiesByFreshness(
           STORAGE_KEYS.SALESPEOPLE,
-          this.getSalespeople().filter(s => !LEGACY_DEMO_IDS.has(s.id)),
-          cleanRemoteSp,
+          this.getSalespeople(),
+          remoteSalespeople,
           'salespeople'
         );
         this.saveSalespeople(mergedSalespeople);
+      } else {
+        const initialSalespeople = this.getSalespeople();
+        await Promise.all(initialSalespeople.map(s => firebaseDb.saveSalesperson(s).catch(() => false)));
       }
     } catch {
       // Opera com cache local se estiver sem internet no momento do login
@@ -2119,14 +2098,14 @@ export const storageService = {
           firebaseDb.getStoreProfile()
         ]);
 
-        const cleanPublic = remotePublicVehicles.filter(v => !LEGACY_DEMO_IDS.has(v.id));
-        const cleanFallback = remoteVehiclesFallback.filter(v => !LEGACY_DEMO_IDS.has(v.id));
-        const bestVehicles = cleanPublic.length > 0
-          ? cleanPublic
-          : (cleanFallback.length > 0 ? cleanFallback.map(sanitizePublicVehicle) : []);
+        const bestVehicles = remotePublicVehicles.length > 0
+          ? remotePublicVehicles
+          : (remoteVehiclesFallback.length > 0 ? remoteVehiclesFallback.map(sanitizePublicVehicle) : []);
 
-        safeSetItem(STORAGE_KEYS.PUBLIC_VEHICLES, JSON.stringify(bestVehicles));
-        safeSetItem(STORAGE_KEYS.VEHICLES, JSON.stringify(bestVehicles));
+        if (bestVehicles.length > 0) {
+          safeSetItem(STORAGE_KEYS.PUBLIC_VEHICLES, JSON.stringify(bestVehicles));
+          safeSetItem(STORAGE_KEYS.VEHICLES, JSON.stringify(bestVehicles));
+        }
         if (remoteStore) {
           const hasPendingLocalStore = getPendingSyncQueue().some(
             op => op.collection === 'store' && op.action === 'upsert'
@@ -2137,7 +2116,7 @@ export const storageService = {
         }
 
         return {
-          vehicles: bestVehicles.length,
+          vehicles: bestVehicles.length > 0 ? bestVehicles.length : this.getPublicVehicles().length,
           owners: 0,
           sales: 0
         };
@@ -2147,7 +2126,7 @@ export const storageService = {
       await this.flushPendingSyncQueue(userRole);
 
       // 2. Equipe autenticada: consulta coleções operacionais; users completo apenas se userRole === 'gestor'
-      const [rawRemoteVehicles, rawRemoteOwners, rawRemoteSales, remoteStore, remoteFinanciers, rawRemoteSalespeople, rawRemoteUsers] = await Promise.all([
+      const [remoteVehicles, remoteOwners, remoteSales, remoteStore, remoteFinanciers, remoteSalespeople, remoteUsers] = await Promise.all([
         firebaseDb.getVehicles(),
         firebaseDb.getOwners(),
         firebaseDb.getSales(),
@@ -2156,17 +2135,6 @@ export const storageService = {
         firebaseDb.getSalespeople(),
         userRole === 'gestor' ? firebaseDb.getUsers() : Promise.resolve([] as SystemUser[])
       ]);
-
-      // Remove automaticamente registros de demonstração legados da nuvem caso tenham sido sincronizados em testes
-      rawRemoteVehicles.filter(v => LEGACY_DEMO_IDS.has(v.id)).forEach(v => firebaseDb.deleteVehicle(v.id).catch(() => {}));
-      rawRemoteSalespeople.filter(s => LEGACY_DEMO_IDS.has(s.id)).forEach(s => firebaseDb.deleteSalesperson(s.id).catch(() => {}));
-      rawRemoteUsers.filter(u => LEGACY_DEMO_IDS.has(u.id)).forEach(u => firebaseDb.deleteUser(u.id).catch(() => {}));
-
-      const remoteVehicles = rawRemoteVehicles.filter(v => !LEGACY_DEMO_IDS.has(v.id));
-      const remoteOwners = rawRemoteOwners.filter(o => !LEGACY_DEMO_IDS.has(o.id));
-      const remoteSales = rawRemoteSales ? rawRemoteSales.filter(s => !LEGACY_DEMO_IDS.has(s.id)) : [];
-      const remoteSalespeople = rawRemoteSalespeople.filter(s => !LEGACY_DEMO_IDS.has(s.id));
-      const remoteUsers = rawRemoteUsers.filter(u => !LEGACY_DEMO_IDS.has(u.id));
 
       // 3. Reconciliação inteligente por versão OCC e timestamp (impede sobrescrita de edições locais mais novas)
       if (remoteVehicles.length > 0) {
@@ -2177,7 +2145,13 @@ export const storageService = {
           'vehicles'
         );
         this.saveVehicles(mergedVehicles);
+      } else {
+        const localVehicles = this.getVehicles();
+        if (localVehicles.length > 0) {
+          await Promise.all(localVehicles.map(v => firebaseDb.saveVehicle(v).catch(() => false)));
+        }
       }
+
       if (remoteOwners.length > 0) {
         const mergedOwners = mergeEntitiesByFreshness(
           STORAGE_KEYS.OWNERS,
@@ -2186,22 +2160,30 @@ export const storageService = {
           'owners'
         );
         this.saveOwners(mergedOwners);
+      } else {
+        const localOwners = this.getOwners();
+        if (localOwners.length > 0) {
+          await Promise.all(localOwners.map(o => firebaseDb.saveOwner(o).catch(() => false)));
+        }
       }
+
       if (remoteSales !== null) {
-        const mergedSales = remoteSales.length > 0
-          ? mergeEntitiesByFreshness(
-              STORAGE_KEYS.SALES,
-              this.getSales(),
-              remoteSales,
-              'sales'
-            )
-          : this.getSales().filter(sale =>
-              getPendingSyncQueue().some(
-                op => op.collection === 'sales' && op.action === 'upsert' && op.entityId === sale.id
-              )
-            );
-        this.saveSales(mergedSales);
+        if (remoteSales.length > 0) {
+          const mergedSales = mergeEntitiesByFreshness(
+            STORAGE_KEYS.SALES,
+            this.getSales(),
+            remoteSales,
+            'sales'
+          );
+          this.saveSales(mergedSales);
+        } else {
+          const localSales = this.getSales();
+          if (localSales.length > 0) {
+            await Promise.all(localSales.map(s => firebaseDb.saveSale(s).catch(() => false)));
+          }
+        }
       }
+
       if (remoteStore) {
         const hasPendingStore = getPendingSyncQueue().some(
           op => op.collection === 'store' && op.action === 'upsert'
@@ -2215,6 +2197,7 @@ export const storageService = {
           }
         }
       }
+
       if (remoteFinanciers.length > 0) {
         const mergedFinanciers = mergeEntitiesByFreshness(
           STORAGE_KEYS.FINANCIERS,
@@ -2223,7 +2206,13 @@ export const storageService = {
           'financiers'
         );
         this.saveFinanciers(mergedFinanciers);
+      } else {
+        const localFin = this.getFinanciers();
+        if (localFin.length > 0) {
+          await Promise.all(localFin.map(f => firebaseDb.saveFinancier(f).catch(() => false)));
+        }
       }
+
       if (remoteSalespeople.length > 0) {
         const mergedSalespeople = mergeEntitiesByFreshness(
           STORAGE_KEYS.SALESPEOPLE,
@@ -2232,7 +2221,13 @@ export const storageService = {
           'salespeople'
         );
         this.saveSalespeople(mergedSalespeople);
+      } else {
+        const localSp = this.getSalespeople();
+        if (localSp.length > 0) {
+          await Promise.all(localSp.map(s => firebaseDb.saveSalesperson(s).catch(() => false)));
+        }
       }
+
       if (userRole === 'gestor') {
         if (remoteUsers.length > 0) {
           const mergedUsers = mergeEntitiesByFreshness(
