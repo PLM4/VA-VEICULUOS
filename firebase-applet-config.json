@@ -1,12 +1,10 @@
 {
-  "projectId": "gen-lang-client-0435058279",
-  "appId": "1:976790020983:web:791649c53e419876c9f772",
-  "apiKey": "AIzaSyDZKF2x3Etp4MLr1FjsYMsbBpMCeBmciL4",
-  "authDomain": "gen-lang-client-0435058279.firebaseapp.com",
-  "firestoreDatabaseId": "va-veiculos",
-  "storageBucket": "gen-lang-client-0435058279.firebasestorage.app",
-  "messagingSenderId": "976790020983",
-  "measurementId": "",
-  "oAuthClientId": "976790020983-re08jcdbopdkk779nv0lc1eh65q5429u.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "apiKey": "AIzaSyB3GmIKS1waOTMiTxa15LDTFctpmlzoIaE",
+  "authDomain": "areialveiculos.firebaseapp.com",
+  "projectId": "areialveiculos",
+  "storageBucket": "areialveiculos.firebasestorage.app",
+  "messagingSenderId": "601448427584",
+  "appId": "1:601448427584:web:fc67d97302c9b1c0d9afa5",
+  "measurementId": "G-9SNK4FH0XP",
+  "firestoreDatabaseId": "(default)"
 }

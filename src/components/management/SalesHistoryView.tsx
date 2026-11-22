@@ -375,9 +375,10 @@ export const SalesHistoryView: React.FC<SalesHistoryViewProps> = ({
 
                       {(sale.formaPagamento === 'financiamento' || sale.formaPagamento === 'misto') && (
                         <div className="text-[11px] text-[#A7A7AB] mt-0.5 font-mono">
-                          Entrada: {formatCurrency(sale.valorEntrada || 0)} + Financiado: {formatCurrency(sale.valorFinanciado || 0)}
-                          {sale.numeroParcelas ? ` (${sale.numeroParcelas}x)` : ''}
-                          {sale.financiadoraNome ? ` • ${sale.financiadoraNome}` : ''}
+                          Banco: <strong className="text-amber-400">{sale.financiadoraNome || 'Instituição Bancária'}</strong>
+                          {sale.valorEntrada && sale.valorEntrada > 0 ? ` • Entrada: ${formatCurrency(sale.valorEntrada)}` : ''}
+                          {sale.valorFinanciado && sale.valorFinanciado > 0 ? ` • Financiado: ${formatCurrency(sale.valorFinanciado)}` : ''}
+                          {sale.numeroParcelas && sale.numeroParcelas > 0 ? ` (${sale.numeroParcelas}x)` : ''}
                         </div>
                       )}
                       {sale.formaPagamento === 'troca' && (

@@ -1,5 +1,6 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, signOut, Auth } from 'firebase/auth';
+import { getAnalytics, Analytics, isSupported as isAnalyticsSupported } from 'firebase/analytics';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, Auth } from 'firebase/auth';
 import { 
   getFirestore, 
   Firestore,
@@ -90,11 +91,25 @@ function ensureOnlineReady(path: string): void {
 let initializedApp: FirebaseApp | null = null;
 let initializedDb: Firestore | null = null;
 let initializedAuth: Auth | null = null;
+let initializedAnalytics: Analytics | null = null;
 
 try {
   initializedApp = initializeApp(firebaseConfig);
-  initializedDb = getFirestore(initializedApp, firebaseConfig.firestoreDatabaseId);
+  const customDbId = (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId;
+  initializedDb =
+    customDbId && customDbId !== '(default)'
+      ? getFirestore(initializedApp, customDbId)
+      : getFirestore(initializedApp);
   initializedAuth = getAuth(initializedApp);
+  if (typeof window !== 'undefined' && firebaseConfig.measurementId) {
+    isAnalyticsSupported()
+      .then((supported) => {
+        if (supported && initializedApp) {
+          initializedAnalytics = getAnalytics(initializedApp);
+        }
+      })
+      .catch(() => {});
+  }
 } catch (initErr) {
   markSyncOffline(initErr instanceof Error ? initErr.message : String(initErr));
   console.warn('Firebase inicializado em modo resiliente local-first:', initErr);
@@ -103,16 +118,24 @@ try {
 export const app = initializedApp as FirebaseApp;
 export const db = initializedDb as Firestore;
 export const auth = initializedAuth as Auth;
+export const analytics = initializedAnalytics;
 
 export const firebaseAuth = {
   async signInStaff(email: string, plainPassword: string): Promise<boolean> {
+    if (forcedOfflineMode || !auth) return false;
+    const cleanEmail = email.trim().toLowerCase();
     try {
-      if (forcedOfflineMode || !auth) return false;
-      await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), plainPassword);
+      await signInWithEmailAndPassword(auth, cleanEmail, plainPassword);
       return true;
     } catch {
-      // Fallback híbrido seguro quando offline ou quando o provedor Cloud Auth não está provisionado para o usuário local
-      return false;
+      try {
+        // Auto-provisiona o usuário no Firebase Auth na primeira autenticação caso o provedor Email/Senha esteja ativo no console
+        await createUserWithEmailAndPassword(auth, cleanEmail, plainPassword);
+        return true;
+      } catch {
+        // Fallback híbrido seguro quando offline ou quando o provedor Cloud Auth não está habilitado no console
+        return false;
+      }
     }
   },
 

@@ -71,6 +71,8 @@ export interface Vehicle {
   antigoDonoId: string;
   dataEntrada: string;
   cadastradoPor?: string; // Vendedor ou gestor que deu entrada
+  responsavelVeiculo?: string; // Sócio ou responsável que colocou o carro à venda na concessionária
+  responsavelTelefone?: string; // Telefone/WhatsApp direto do sócio responsável pelo veículo
   valorPago: number; // Preço pago pela loja ao antigo dono
   debitoDetran: DetranDebt;
   reciboCompraGerado: boolean;

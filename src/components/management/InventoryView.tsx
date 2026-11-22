@@ -67,7 +67,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         v.modelo.toLowerCase().includes(q) ||
         v.versao.toLowerCase().includes(q) ||
         v.placa.toLowerCase().includes(q) ||
-        v.cor.toLowerCase().includes(q);
+        v.cor.toLowerCase().includes(q) ||
+        (v.responsavelVeiculo || '').toLowerCase().includes(q) ||
+        (v.cadastradoPor || '').toLowerCase().includes(q);
 
       let matchesTab = true;
       if (activeTab === 'em_estoque') matchesTab = v.status === 'em_estoque';
@@ -287,6 +289,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               <span>•</span>
                               <span>{v.cor}</span>
                             </div>
+                            {(v.responsavelVeiculo || v.cadastradoPor) && (
+                              <div className="text-[11px] text-amber-400/90 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                <span>
+                                  Responsável (Sócio): <strong className="text-amber-300">{v.responsavelVeiculo || v.cadastradoPor}</strong>
+                                </span>
+                                {v.responsavelTelefone && (
+                                  <a
+                                    href={`https://wa.me/55${v.responsavelTelefone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${v.responsavelVeiculo || v.cadastradoPor}, preciso falar sobre o veículo ${v.marca} ${v.modelo} (${v.placa}).`)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-1.5 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono transition-colors"
+                                    title="Falar direto com o sócio responsável no WhatsApp"
+                                  >
+                                    WhatsApp: {v.responsavelTelefone}
+                                  </a>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -473,6 +493,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <p className="text-xs text-[#A7A7AB] font-mono">
                         {v.placa} • {v.anoFabricacao}/{v.anoModelo} • {v.cor}
                       </p>
+                      {(v.responsavelVeiculo || v.cadastradoPor) && (
+                        <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-1">
+                          <span className="text-amber-300 truncate">
+                            Sócio: <strong>{v.responsavelVeiculo || v.cadastradoPor}</strong>
+                          </span>
+                          {v.responsavelTelefone && (
+                            <a
+                              href={`https://wa.me/55${v.responsavelTelefone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${v.responsavelVeiculo || v.cadastradoPor}, preciso falar sobre o veículo ${v.marca} ${v.modelo} (${v.placa}).`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-emerald-400 hover:text-emerald-300 font-mono text-[10px] underline shrink-0"
+                            >
+                              {v.responsavelTelefone}
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#2D2D32]">

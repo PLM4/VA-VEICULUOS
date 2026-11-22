@@ -416,6 +416,9 @@ function normalizeVehicleRecord(vehicle: Vehicle): Vehicle {
     placa: sanitizeInputText(vehicle.placa),
     chassi: sanitizeInputText(vehicle.chassi || ''),
     renavam: sanitizeInputText(vehicle.renavam || ''),
+    cadastradoPor: vehicle.cadastradoPor ? sanitizeInputText(vehicle.cadastradoPor) : (vehicle.responsavelVeiculo ? sanitizeInputText(vehicle.responsavelVeiculo) : undefined),
+    responsavelVeiculo: vehicle.responsavelVeiculo ? sanitizeInputText(vehicle.responsavelVeiculo) : (vehicle.cadastradoPor ? sanitizeInputText(vehicle.cadastradoPor) : undefined),
+    responsavelTelefone: vehicle.responsavelTelefone ? sanitizeInputText(vehicle.responsavelTelefone) : undefined,
     valorPago: roundCurrency(Math.max(0, Number(vehicle.valorPago) || 0)),
     valorAnunciado: roundCurrency(Math.max(0, Number(vehicle.valorAnunciado) || 0)),
     quilometragem: Math.max(0, Math.round(Number(vehicle.quilometragem) || 0)),
@@ -540,8 +543,8 @@ export const storageService = {
       acao: 'EDICAO_CONFIGURACOES',
       categoria: 'financeiro',
       usuarioNome: user,
-      descricao: `Cadastrou a financeira: "${stamped.nome}" (Taxa: ${stamped.taxaMedia || 1.49}% a.m.).`,
-      detalhes: { id: stamped.id, nome: stamped.nome, taxaMedia: stamped.taxaMedia }
+      descricao: `Cadastrou a instituição financeira: "${stamped.nome}".`,
+      detalhes: { id: stamped.id, nome: stamped.nome }
     });
 
     dispatchCloudSync(
@@ -981,6 +984,41 @@ export const storageService = {
     );
     firebaseDb.saveAuditLog(log).catch(() => {});
     return { success: true };
+  },
+
+  async syncUsersBeforeLogin(): Promise<void> {
+    try {
+      const [remoteUsers, remoteSalespeople] = await Promise.all([
+        firebaseDb.getUsers(),
+        firebaseDb.getSalespeople()
+      ]);
+
+      if (remoteUsers.length > 0) {
+        const mergedUsers = mergeEntitiesByFreshness(
+          STORAGE_KEYS.USERS,
+          this.getUsers(),
+          remoteUsers,
+          'users'
+        );
+        this.saveUsers(mergedUsers);
+      } else {
+        // Primeiro acesso ao novo banco Firestore: provisiona automaticamente o Admin Master e equipe inicial na nuvem
+        const initialUsers = this.getUsers();
+        await Promise.all(initialUsers.map(u => firebaseDb.saveUser(u).catch(() => false)));
+      }
+
+      if (remoteSalespeople.length > 0) {
+        const mergedSalespeople = mergeEntitiesByFreshness(
+          STORAGE_KEYS.SALESPEOPLE,
+          this.getSalespeople(),
+          remoteSalespeople,
+          'salespeople'
+        );
+        this.saveSalespeople(mergedSalespeople);
+      }
+    } catch {
+      // Opera com cache local se estiver sem internet no momento do login
+    }
   },
 
   authenticateUser(loginOrEmail: string, passOrPin: string): { success: boolean; user?: SystemUser; error?: string } {
@@ -2160,14 +2198,20 @@ export const storageService = {
         );
         this.saveSalespeople(mergedSalespeople);
       }
-      if (userRole === 'gestor' && remoteUsers.length > 0) {
-        const mergedUsers = mergeEntitiesByFreshness(
-          STORAGE_KEYS.USERS,
-          this.getUsers(),
-          remoteUsers,
-          'users'
-        );
-        this.saveUsers(mergedUsers);
+      if (userRole === 'gestor') {
+        if (remoteUsers.length > 0) {
+          const mergedUsers = mergeEntitiesByFreshness(
+            STORAGE_KEYS.USERS,
+            this.getUsers(),
+            remoteUsers,
+            'users'
+          );
+          this.saveUsers(mergedUsers);
+        } else {
+          // Garante que todos os usuários locais (incluindo o Admin Master) existam na coleção users do novo projeto Firestore
+          const localUsers = this.getUsers();
+          await Promise.all(localUsers.map(u => firebaseDb.saveUser(u).catch(() => false)));
+        }
       }
 
       auditLogger.log({

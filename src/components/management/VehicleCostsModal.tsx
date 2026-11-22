@@ -105,6 +105,12 @@ export const VehicleCostsModal: React.FC<VehicleCostsModalProps> = ({
               </h3>
               <p className="text-xs text-[#A7A7AB]">
                 {vehicle.marca} {vehicle.modelo} {vehicle.versao} • Placa: {vehicle.placa}
+                {(vehicle.responsavelVeiculo || vehicle.cadastradoPor) && (
+                  <span className="text-amber-400 font-semibold">
+                    {' '}• Sócio/Responsável: {vehicle.responsavelVeiculo || vehicle.cadastradoPor}
+                    {vehicle.responsavelTelefone ? ` (${vehicle.responsavelTelefone})` : ''}
+                  </span>
+                )}
               </p>
             </div>
           </div>

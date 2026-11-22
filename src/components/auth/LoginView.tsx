@@ -32,6 +32,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Sincroniza usuários cadastrados na nuvem ao abrir a tela de login (permite login de novos usuários em qualquer dispositivo)
+  React.useEffect(() => {
+    storageService.syncUsersBeforeLogin().catch(() => {});
+  }, []);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -48,6 +53,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setIsLoading(true);
 
     setTimeout(async () => {
+      await storageService.syncUsersBeforeLogin();
       const result = storageService.authenticateUser(loginInput, password);
 
       if (!result.success || !result.user) {
