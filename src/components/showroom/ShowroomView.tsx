@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Car, Search, ChevronDown, SlidersHorizontal, 
-  MapPin, Phone, MessageCircle, X, RotateCcw, Check
+  MapPin, Phone, MessageCircle, X, RotateCcw, Check, Lock
 } from 'lucide-react';
 import { Vehicle, StoreProfile, VehicleType } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
@@ -897,9 +897,10 @@ export const ShowroomView: React.FC<ShowroomViewProps> = ({
               <button
                 type="button"
                 onClick={onEnterManagement}
-                className="hover:text-neutral-400 transition-colors cursor-pointer underline text-[11px]"
+                className="p-1.5 rounded-md hover:text-neutral-400 transition-colors cursor-pointer"
+                aria-label="Painel"
               >
-                Acesso Restrito
+                <Lock className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

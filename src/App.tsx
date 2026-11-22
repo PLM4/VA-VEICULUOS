@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Lock } from 'lucide-react';
 import { Sidebar } from './components/navigation/Sidebar';
 import { Topbar } from './components/navigation/Topbar';
 import { GlobalSearchModal } from './components/navigation/GlobalSearchModal';
@@ -664,9 +665,10 @@ export default function App() {
 
             <button
               onClick={handleEnterManagement}
-              className="px-3.5 py-1.5 rounded-[8px] bg-[#17171A] hover:bg-[#202024] border border-[#2D2D32] hover:border-[#D4130D] text-xs font-semibold text-[#CAC9CA] hover:text-white transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-[8px] bg-[#17171A] hover:bg-[#202024] border border-[#2D2D32] hover:border-[#D4130D] flex items-center justify-center text-[#CAC9CA] hover:text-white transition-colors cursor-pointer"
+              aria-label="Painel"
             >
-              Acessar Painel Administrativo →
+              <Lock className="w-4 h-4" />
             </button>
           </div>
 

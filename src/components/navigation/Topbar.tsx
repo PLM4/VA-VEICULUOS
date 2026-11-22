@@ -257,15 +257,14 @@ export const Topbar: React.FC<TopbarProps> = ({
       {/* Seção Direita: Link Único da Vitrine, Notificações e Menu de Perfil */}
       <div className="flex items-center gap-2 sm:gap-3">
         
-        {/* ÚNICO BOTÃO DA VITRINE: Menor, discreto, sem emoji de brilho */}
+        {/* ÚNICO BOTÃO DA VITRINE: Apenas ícone discreto */}
         <button
           type="button"
           onClick={onOpenShowroom}
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium rounded-[6px] bg-[#17171A] hover:bg-[#202024] border border-[#2D2D32] hover:border-[#D4130D]/40 text-[#CAC9CA] hover:text-white transition-all cursor-pointer group"
-          title="Abrir página de acesso para os clientes"
+          className="flex items-center justify-center p-2 rounded-[8px] bg-[#17171A] hover:bg-[#202024] border border-[#2D2D32] hover:border-[#D4130D]/40 text-[#CAC9CA] hover:text-white transition-all cursor-pointer group"
+          aria-label="Vitrine"
         >
-          <ExternalLink className="w-3 h-3 text-[#A7A7AB] group-hover:text-white transition-colors" />
-          <span>Página de Acesso dos Clientes</span>
+          <ExternalLink className="w-4 h-4 text-[#A7A7AB] group-hover:text-white transition-colors" />
         </button>
 
         {/* Central de Notificações 100% Funcional */}
