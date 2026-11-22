@@ -92,7 +92,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // Formulário de Novas Financeiras
   const [newFinNome, setNewFinNome] = useState('');
-  const [newFinTaxa, setNewFinTaxa] = useState<number>(1.49);
   const [newFinTelefone, setNewFinTelefone] = useState('');
   const [newFinContato, setNewFinContato] = useState('');
   const [financierFilter, setFinancierFilter] = useState<'todas' | 'ativas' | 'desativadas'>('todas');
@@ -251,10 +250,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       alert('Informe o nome da instituição financeira.');
       return;
     }
-    if (isNaN(newFinTaxa) || !Number.isFinite(newFinTaxa) || newFinTaxa < 0.01 || newFinTaxa > 50) {
-      alert('Por favor, informe uma taxa média de juros válida (entre 0.01% e 50.0% a.m.).');
-      return;
-    }
     if (newFinTelefone.trim() && !isValidPhone(newFinTelefone)) {
       alert('Por favor, informe um telefone válido com DDD (10 ou 11 dígitos) para a financeira.');
       return;
@@ -262,7 +257,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const fin: Financier = {
       id: 'fin_' + Date.now(),
       nome: newFinNome.trim(),
-      taxaMedia: Number(newFinTaxa),
       telefone: newFinTelefone.trim() ? maskPhone(newFinTelefone) : '',
       contato: newFinContato.trim() ? newFinContato.trim() : undefined,
       contatoGerente: newFinContato.trim() ? newFinContato.trim() : undefined,
@@ -271,7 +265,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     };
     onAddFinancier(fin);
     setNewFinNome('');
-    setNewFinTaxa(1.49);
     setNewFinTelefone('');
     setNewFinContato('');
   };
@@ -300,11 +293,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       alert('Informe o nome da instituição financeira.');
       return;
     }
-    const taxa = Number(editingFinancier.taxaMedia);
-    if (isNaN(taxa) || !Number.isFinite(taxa) || taxa < 0.01 || taxa > 50) {
-      alert('Por favor, informe uma taxa média de juros válida (entre 0.01% e 50.0% a.m.).');
-      return;
-    }
     if (editingFinancier.telefone && editingFinancier.telefone.trim() && !isValidPhone(editingFinancier.telefone)) {
       alert('Por favor, informe um telefone válido com DDD (10 ou 11 dígitos) para a financeira.');
       return;
@@ -312,7 +300,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const sanitizedFinancier: Financier = {
       ...editingFinancier,
       nome: editingFinancier.nome.trim(),
-      taxaMedia: taxa,
       telefone: editingFinancier.telefone?.trim() ? maskPhone(editingFinancier.telefone) : '',
       contato: editingFinancier.contato?.trim() || undefined,
       contatoGerente: editingFinancier.contatoGerente?.trim() || editingFinancier.contato?.trim() || undefined
@@ -1223,9 +1210,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </span>
             </div>
 
-            <form onSubmit={handleAddFinancierSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <form onSubmit={handleAddFinancierSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className={formStyles.label}>Nome da Financeira *</label>
+                <label className={formStyles.label}>Nome do Banco / Financeira *</label>
                 <input
                   type="text"
                   required
@@ -1233,20 +1220,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   value={newFinNome}
                   onChange={(e) => setNewFinNome(e.target.value)}
                   placeholder="Ex: Santander Financiamentos"
-                  className={formStyles.input}
-                />
-              </div>
-
-              <div>
-                <label className={formStyles.label}>Taxa Média a.m. (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  max="50"
-                  required
-                  value={newFinTaxa}
-                  onChange={(e) => setNewFinTaxa(clampNumber(e.target.value, 0, 50, 0))}
                   className={formStyles.input}
                 />
               </div>
@@ -1275,7 +1248,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 />
               </div>
 
-              <div className="sm:col-span-2 lg:col-span-4 flex justify-end pt-2">
+              <div className="sm:col-span-3 flex justify-end pt-2">
                 <button
                   type="submit"
                   className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold transition-colors cursor-pointer flex items-center gap-2 shadow-lg shadow-amber-500/10"
@@ -1386,7 +1359,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                             <div className="text-xs text-neutral-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                               <span>Mesa: <strong className="text-neutral-300">{f.contato || f.contatoGerente || 'Geral'}</strong></span>
                               {f.telefone && <span>• Tel: <strong className="text-neutral-300">{f.telefone}</strong></span>}
-                              <span>• Taxa Média: <strong className="text-emerald-400 font-num">{f.taxaMedia || 1.49}% a.m.</strong></span>
                             </div>
                           </div>
                         </div>
@@ -1748,30 +1720,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={formStyles.label}>Taxa Média a.m. (%)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max="50"
-                    required
-                    value={editingFinancier.taxaMedia ?? 1.49}
-                    onChange={(e) => setEditingFinancier({ ...editingFinancier, taxaMedia: clampNumber(e.target.value, 0, 50, 0) })}
-                    className={formStyles.input}
-                  />
-                </div>
-                <div>
-                  <label className={formStyles.label}>Telefone</label>
-                  <input
-                    type="text"
-                    maxLength={15}
-                    value={editingFinancier.telefone || ''}
-                    onChange={(e) => setEditingFinancier({ ...editingFinancier, telefone: maskPhone(e.target.value) })}
-                    className={formStyles.input}
-                  />
-                </div>
+              <div>
+                <label className={formStyles.label}>Telefone</label>
+                <input
+                  type="text"
+                  maxLength={15}
+                  value={editingFinancier.telefone || ''}
+                  onChange={(e) => setEditingFinancier({ ...editingFinancier, telefone: maskPhone(e.target.value) })}
+                  className={formStyles.input}
+                />
               </div>
 
               <div>

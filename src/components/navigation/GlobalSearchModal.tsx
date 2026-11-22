@@ -827,11 +827,6 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                       <span className="text-xs font-semibold text-[#F5F5F5] group-hover:text-[#3B82F6]">
                         Financeira: {f.nome}
                       </span>
-                      {f.taxaMedia && (
-                        <span className="text-[10px] text-neutral-400 font-mono">
-                          (Taxa: {f.taxaMedia}%)
-                        </span>
-                      )}
                     </div>
                     <ArrowRight className="w-3.5 h-3.5 text-[#68686E] group-hover:text-white" />
                   </button>

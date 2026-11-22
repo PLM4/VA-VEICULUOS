@@ -69,7 +69,23 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
   const [placa, setPlaca] = useState('');
   const [chassi, setChassi] = useState('');
   const [renavam, setRenavam] = useState('');
-  const cadastradoPor = 'Gestor Geral';
+  const [responsavelVeiculo, setResponsavelVeiculo] = useState('');
+  const [responsavelTelefone, setResponsavelTelefone] = useState('');
+  const [isAddingNewPartner, setIsAddingNewPartner] = useState(false);
+
+  // Lista de sócios/responsáveis já cadastrados nos veículos anteriores
+  const registeredPartners = React.useMemo(() => {
+    const map = new Map<string, string>();
+    (vehicles || []).forEach(v => {
+      const nome = (v.responsavelVeiculo || v.cadastradoPor || '').trim();
+      if (nome && nome !== 'Gestor Geral' && nome !== 'Gestor') {
+        if (!map.has(nome) || v.responsavelTelefone) {
+          map.set(nome, v.responsavelTelefone || map.get(nome) || '');
+        }
+      }
+    });
+    return Array.from(map.entries()).map(([nome, telefone]) => ({ nome, telefone }));
+  }, [vehicles]);
   
   // Fotos (upload até 10 fotos)
   const [fotoUrl, setFotoUrl] = useState('');
@@ -177,6 +193,16 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
 
     if (!marca.trim() || !modelo.trim() || !placa.trim()) {
       alert('Preencha os dados essenciais do veículo (Marca, Modelo e Placa).');
+      return;
+    }
+
+    if (!responsavelVeiculo.trim()) {
+      alert('Informe ou selecione o Sócio / Responsável pelo veículo (quem colocou o carro à venda na concessionária).');
+      return;
+    }
+
+    if (responsavelTelefone.trim() && !isValidPhone(responsavelTelefone)) {
+      alert('Por favor, informe um telefone/WhatsApp válido com DDD para o Sócio / Responsável pelo veículo.');
       return;
     }
 
@@ -299,7 +325,9 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
       fotos: fotosList.length > 0 ? fotosList : ['https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=1200&q=80'],
       antigoDonoId: ownerToUse.id,
       dataEntrada: new Date().toISOString(),
-      cadastradoPor,
+      cadastradoPor: responsavelVeiculo.trim() || 'Gestor Geral',
+      responsavelVeiculo: responsavelVeiculo.trim(),
+      responsavelTelefone: responsavelTelefone.trim() ? maskPhone(responsavelTelefone) : undefined,
       valorPago: valorPagoNum,
       debitoDetran: debitoData,
       reciboCompraGerado: true,
@@ -487,6 +515,88 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
             )}
           </div>
 
+          {/* SECTION 1.5: SÓCIO / RESPONSÁVEL PELO VEÍCULO NA CONCESSIONÁRIA */}
+          <div className="bg-neutral-950 p-4 rounded-xl border border-amber-500/30 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  Responsável pelo Veículo (Sócio que colocou à venda) *
+                </h4>
+                <p className="text-[11px] text-neutral-400 mt-0.5">
+                  Identifique o sócio responsável por este veículo na concessionária para contato direto caso ocorra qualquer problema.
+                </p>
+              </div>
+              {registeredPartners.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingNewPartner(!isAddingNewPartner);
+                    if (!isAddingNewPartner) {
+                      setResponsavelVeiculo('');
+                      setResponsavelTelefone('');
+                    }
+                  }}
+                  className="text-xs text-amber-400 hover:text-amber-300 font-semibold underline cursor-pointer"
+                >
+                  {isAddingNewPartner ? '← Selecionar Sócio Cadastrado' : '+ Cadastrar Novo Sócio / Responsável'}
+                </button>
+              )}
+            </div>
+
+            {registeredPartners.length > 0 && !isAddingNewPartner && (
+              <div className="flex flex-wrap gap-2 pb-1">
+                {registeredPartners.map((p) => {
+                  const isSelected = responsavelVeiculo === p.nome;
+                  return (
+                    <button
+                      key={p.nome}
+                      type="button"
+                      onClick={() => {
+                        setResponsavelVeiculo(p.nome);
+                        setResponsavelTelefone(p.telefone || '');
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-amber-500 text-neutral-950 border-amber-400 font-bold'
+                          : 'bg-neutral-900 text-neutral-300 border-neutral-700 hover:border-amber-500/50'
+                      }`}
+                    >
+                      {p.nome}{p.telefone ? ` (${p.telefone})` : ''}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-neutral-400 block mb-1">Nome do Sócio / Responsável pelo Carro *</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={100}
+                  value={responsavelVeiculo}
+                  onChange={(e) => setResponsavelVeiculo(e.target.value)}
+                  placeholder="Ex: Sócio João, Marcos, etc."
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-neutral-400 block mb-1">WhatsApp / Telefone Direto do Sócio (Opcional)</label>
+                <input
+                  type="text"
+                  maxLength={15}
+                  value={responsavelTelefone}
+                  onChange={(e) => setResponsavelTelefone(maskPhone(e.target.value))}
+                  placeholder="(83) 98765-4321"
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* SECTION 2: DADOS DO VEÍCULO & ATÉ 10 FOTOS */}
           <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 space-y-4">
             <div className="flex items-center justify-between">
@@ -494,9 +604,11 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
                 <Car className="w-4 h-4" />
                 2. Especificações do Veículo & Galeria (Até 10 Fotos)
               </h4>
-              <span className="text-[11px] text-neutral-400">
-                Cadastrado por: <strong className="text-white">{cadastradoPor}</strong>
-              </span>
+              {responsavelVeiculo.trim() && (
+                <span className="text-[11px] text-neutral-400">
+                  Responsável: <strong className="text-amber-400">{responsavelVeiculo}</strong>
+                </span>
+              )}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -313,10 +313,28 @@ export function renderTemplate(templateContent: string, context: MergeContext): 
   if (sale) {
     if (sale.formaPagamento === 'financiamento') {
       formaPagtoTexto = `Financiamento Bancário através da instituição ${sale.financiadoraNome || 'Financeira Credenciada'}`;
-      detalhesFinanc = `Composição: Entrada de ${formatCurrency(sale.valorEntrada || 0)} + Saldo Financiado de ${formatCurrency(sale.valorFinanciado || 0)} em ${sale.numeroParcelas || 1}x pela instituição ${sale.financiadoraNome || 'Financeira Credenciada'}.`;
+      const parts: string[] = [`Banco: ${sale.financiadoraNome || 'Financeira Credenciada'}`];
+      if (sale.valorEntrada && toCents(sale.valorEntrada) > 0) {
+        parts.push(`Entrada: ${formatCurrency(sale.valorEntrada)}`);
+      }
+      if (sale.valorFinanciado && toCents(sale.valorFinanciado) > 0) {
+        parts.push(`Valor Financiado: ${formatCurrency(sale.valorFinanciado)}`);
+      }
+      if (sale.numeroParcelas && sale.numeroParcelas > 0) {
+        parts.push(`Parcelas: ${sale.numeroParcelas}x`);
+      }
+      detalhesFinanc = `Composição: ${parts.join(' | ')}.`;
     } else if (sale.formaPagamento === 'misto') {
       formaPagtoTexto = `Pagamento Misto (Entrada à Vista + Financiamento pela instituição ${sale.financiadoraNome || 'Financeira Credenciada'})`;
-      detalhesFinanc = `Composição: Entrada à Vista de ${formatCurrency(sale.valorEntrada || 0)} + Saldo Financiado de ${formatCurrency(sale.valorFinanciado || 0)} em ${sale.numeroParcelas || 1}x pela instituição ${sale.financiadoraNome || 'Financeira Credenciada'}.`;
+      const parts: string[] = [
+        `Banco: ${sale.financiadoraNome || 'Financeira Credenciada'}`,
+        `Entrada à Vista: ${formatCurrency(sale.valorEntrada || 0)}`,
+        `Saldo Financiado: ${formatCurrency(sale.valorFinanciado || 0)}`
+      ];
+      if (sale.numeroParcelas && sale.numeroParcelas > 0) {
+        parts.push(`Parcelas: ${sale.numeroParcelas}x`);
+      }
+      detalhesFinanc = `Composição: ${parts.join(' | ')}.`;
     } else if (sale.formaPagamento === 'cartao_credito') {
       formaPagtoTexto =
         sale.numeroParcelas && sale.numeroParcelas > 1

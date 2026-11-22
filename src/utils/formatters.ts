@@ -776,7 +776,44 @@ export function validateSaleFinancials(sale: Partial<Sale>): SaleFinancialValida
     const financiadoCents =
       sale.valorFinanciado !== undefined && sale.valorFinanciado !== null
         ? toCents(sale.valorFinanciado)
-        : vendaCents - entradaCents;
+        : method === 'financiamento'
+          ? 0
+          : vendaCents - entradaCents;
+
+    const parcelas =
+      sale.numeroParcelas !== undefined && Number(sale.numeroParcelas) > 0
+        ? Math.max(1, Math.round(Number(sale.numeroParcelas)))
+        : undefined;
+
+    if (method === 'financiamento') {
+      // No financiamento, valor financiado e quantidade de parcelas são opcionais (pode informar apenas o banco)
+      if (financiadoCents < 0 || financiadoCents > vendaCents) {
+        return {
+          valid: false,
+          error: 'O valor do financiamento não pode ser negativo nem superior ao valor total da venda.',
+          normalizedVenda: fromCents(vendaCents),
+          normalizedComissao: fromCents(comissaoCents)
+        };
+      }
+      if (entradaCents > 0 && financiadoCents > 0 && entradaCents + financiadoCents !== vendaCents) {
+        const diff = fromCents(Math.abs(vendaCents - (entradaCents + financiadoCents)));
+        return {
+          valid: false,
+          error: `Desequilíbrio financeiro na venda: Entrada (${formatCurrency(fromCents(entradaCents))}) + Financiamento (${formatCurrency(fromCents(financiadoCents))}) difere do Valor Total de Venda (${formatCurrency(fromCents(vendaCents))}) em ${formatCurrency(diff)}.`,
+          normalizedVenda: fromCents(vendaCents),
+          normalizedComissao: fromCents(comissaoCents)
+        };
+      }
+
+      return {
+        valid: true,
+        normalizedVenda: fromCents(vendaCents),
+        normalizedEntrada: entradaCents > 0 ? fromCents(entradaCents) : undefined,
+        normalizedFinanciado: financiadoCents > 0 ? fromCents(financiadoCents) : undefined,
+        normalizedComissao: fromCents(comissaoCents),
+        normalizedParcelas: parcelas
+      };
+    }
 
     if (financiadoCents <= 0) {
       return {
@@ -797,7 +834,6 @@ export function validateSaleFinancials(sale: Partial<Sale>): SaleFinancialValida
       };
     }
 
-    const parcelas = sale.numeroParcelas !== undefined ? Math.max(1, Math.round(Number(sale.numeroParcelas) || 1)) : 48;
     return {
       valid: true,
       normalizedVenda: fromCents(vendaCents),

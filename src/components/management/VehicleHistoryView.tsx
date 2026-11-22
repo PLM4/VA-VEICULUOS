@@ -241,9 +241,14 @@ export const VehicleHistoryView: React.FC<VehicleHistoryViewProps> = ({
                               Pago: <strong className="text-amber-400 tabular-nums">{formatCurrency(vehicle.valorPago)}</strong>
                             </span>
                           )}
-                          <span className="text-[10px] text-neutral-500">
-                            Entrada por: {vehicle.cadastradoPor || 'Gestor'}
+                          <span className="text-[10px] text-amber-400 font-medium">
+                            Sócio/Resp.: {vehicle.responsavelVeiculo || vehicle.cadastradoPor || 'Gestor'}
                           </span>
+                          {vehicle.responsavelTelefone && (
+                            <span className="text-[10px] text-neutral-400 font-mono">
+                              Tel: {vehicle.responsavelTelefone}
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -430,7 +435,25 @@ export const VehicleHistoryView: React.FC<VehicleHistoryViewProps> = ({
                               <p><strong className="text-neutral-400">Débito Detran:</strong> {selectedVehicleForDossier.debitoDetran?.temDebito ? `${formatCurrency(selectedVehicleForDossier.debitoDetran.valor)} (Arcado por: ${selectedVehicleForDossier.debitoDetran.quemArca})` : 'Sem débitos'}</p>
                             </>
                           )}
-                          <p><strong className="text-neutral-400">Cadastrado por:</strong> {selectedVehicleForDossier.cadastradoPor || 'Gestor'}</p>
+                          <p>
+                            <strong className="text-neutral-400">Sócio / Responsável pelo Carro:</strong>{' '}
+                            <span className="text-amber-400 font-bold">
+                              {selectedVehicleForDossier.responsavelVeiculo || selectedVehicleForDossier.cadastradoPor || 'Gestor'}
+                            </span>
+                          </p>
+                          {selectedVehicleForDossier.responsavelTelefone && (
+                            <p>
+                              <strong className="text-neutral-400">Contato Direto do Sócio:</strong>{' '}
+                              <a
+                                href={`https://wa.me/55${selectedVehicleForDossier.responsavelTelefone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${selectedVehicleForDossier.responsavelVeiculo || selectedVehicleForDossier.cadastradoPor}, preciso falar sobre o veículo ${selectedVehicleForDossier.marca} ${selectedVehicleForDossier.modelo} (${selectedVehicleForDossier.placa}).`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-400 hover:underline font-mono"
+                              >
+                                {selectedVehicleForDossier.responsavelTelefone} (Falar no WhatsApp)
+                              </a>
+                            </p>
+                          )}
                           {isGestor && (
                             <p><strong className="text-neutral-400">Custo Total de Aquisição:</strong> {formatCurrency(computeAcquisitionCost(selectedVehicleForDossier))}</p>
                           )}

@@ -493,6 +493,9 @@ export function sanitizePublicVehicle(vehicle: Vehicle): Vehicle {
     fotos: vehicle.fotos || [],
     antigoDonoId: '',
     dataEntrada: vehicle.dataEntrada,
+    cadastradoPor: vehicle.cadastradoPor,
+    responsavelVeiculo: vehicle.responsavelVeiculo,
+    responsavelTelefone: vehicle.responsavelTelefone,
     valorPago: 0,
     debitoDetran: {
       temDebito: false,
