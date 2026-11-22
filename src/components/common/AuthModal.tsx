@@ -70,6 +70,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     setIsSubmitting(true);
+    await storageService.syncUsersBeforeLogin();
     const authResult = storageService.authenticateUser(loginIdentifier, cleanPass);
 
     if (!authResult.success || !authResult.user) {
