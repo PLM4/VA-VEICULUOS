@@ -57,21 +57,43 @@ export interface CommissionAssignOptions {
 }
 
 const STORAGE_KEYS = {
-  STORE: 'vaveiculos_store_v2',
-  FINANCIERS: 'vaveiculos_financiers_v2',
-  SALESPEOPLE: 'vaveiculos_salespeople_v2',
-  USERS: 'vaveiculos_users_v2',
-  TEMPLATES: 'vaveiculos_templates_v2',
-  OWNERS: 'vaveiculos_owners_v2',
-  VEHICLES: 'vaveiculos_vehicles_v2',
-  PUBLIC_VEHICLES: 'vaveiculos_public_vehicles_v2',
-  SALES: 'vaveiculos_sales_v2',
-  ACTIVE_ROLE: 'vaveiculos_active_role_v2',
-  ACTIVE_SELLER_ID: 'vaveiculos_active_seller_id_v2',
-  PENDING_SYNC: 'vaveiculos_pending_sync_v1'
+  STORE: 'vaveiculos_store_v3',
+  FINANCIERS: 'vaveiculos_financiers_v3',
+  SALESPEOPLE: 'vaveiculos_salespeople_v3',
+  USERS: 'vaveiculos_users_v3',
+  TEMPLATES: 'vaveiculos_templates_v3',
+  OWNERS: 'vaveiculos_owners_v3',
+  VEHICLES: 'vaveiculos_vehicles_v3',
+  PUBLIC_VEHICLES: 'vaveiculos_public_vehicles_v3',
+  SALES: 'vaveiculos_sales_v3',
+  ACTIVE_ROLE: 'vaveiculos_active_role_v3',
+  ACTIVE_SELLER_ID: 'vaveiculos_active_seller_id_v3',
+  PENDING_SYNC: 'vaveiculos_pending_sync_v3'
 };
 
-const AUDIT_STORAGE_KEY = 'vaveiculos_audit_logs_v1';
+const AUDIT_STORAGE_KEY = 'vaveiculos_audit_logs_v3';
+
+const LEGACY_DEMO_IDS = new Set<string>([
+  'vend_carlos',
+  'vend_juliana',
+  'vend_roberto',
+  'owner_marcos',
+  'owner_alessandra',
+  'owner_lucas',
+  'owner_renata',
+  'veh_bmw320i',
+  'veh_compass',
+  'veh_corolla_repasse',
+  'veh_yamaha_mt07',
+  'veh_hilux_srx',
+  'veh_pulse_audace',
+  'veh_civic_touring',
+  'veh_tcross',
+  'veh_onix_repasse',
+  'sale_civic_01',
+  'sale_onix_02',
+  'sale_tcross_03'
+]);
 
 // Fallback resiliente em memória caso o navegador atinja QuotaExceededError (~5 MB) ou bloqueie Web Storage
 const memoryFallbackStore = new Map<string, string>();
@@ -994,24 +1016,26 @@ export const storageService = {
       ]);
 
       if (remoteUsers.length > 0) {
+        const cleanRemoteUsers = remoteUsers.filter(u => !LEGACY_DEMO_IDS.has(u.id));
         const mergedUsers = mergeEntitiesByFreshness(
           STORAGE_KEYS.USERS,
-          this.getUsers(),
-          remoteUsers,
+          this.getUsers().filter(u => !LEGACY_DEMO_IDS.has(u.id)),
+          cleanRemoteUsers,
           'users'
         );
-        this.saveUsers(mergedUsers);
+        this.saveUsers(mergedUsers.length > 0 ? mergedUsers : SEED_USERS);
       } else {
-        // Primeiro acesso ao novo banco Firestore: provisiona automaticamente o Admin Master e equipe inicial na nuvem
-        const initialUsers = this.getUsers();
+        // Primeiro acesso ao novo banco Firestore: provisiona automaticamente o Admin Master na nuvem
+        const initialUsers = this.getUsers().filter(u => !LEGACY_DEMO_IDS.has(u.id));
         await Promise.all(initialUsers.map(u => firebaseDb.saveUser(u).catch(() => false)));
       }
 
       if (remoteSalespeople.length > 0) {
+        const cleanRemoteSp = remoteSalespeople.filter(s => !LEGACY_DEMO_IDS.has(s.id));
         const mergedSalespeople = mergeEntitiesByFreshness(
           STORAGE_KEYS.SALESPEOPLE,
-          this.getSalespeople(),
-          remoteSalespeople,
+          this.getSalespeople().filter(s => !LEGACY_DEMO_IDS.has(s.id)),
+          cleanRemoteSp,
           'salespeople'
         );
         this.saveSalespeople(mergedSalespeople);
@@ -2095,14 +2119,14 @@ export const storageService = {
           firebaseDb.getStoreProfile()
         ]);
 
-        const bestVehicles = remotePublicVehicles.length > 0
-          ? remotePublicVehicles
-          : (remoteVehiclesFallback.length > 0 ? remoteVehiclesFallback.map(sanitizePublicVehicle) : []);
+        const cleanPublic = remotePublicVehicles.filter(v => !LEGACY_DEMO_IDS.has(v.id));
+        const cleanFallback = remoteVehiclesFallback.filter(v => !LEGACY_DEMO_IDS.has(v.id));
+        const bestVehicles = cleanPublic.length > 0
+          ? cleanPublic
+          : (cleanFallback.length > 0 ? cleanFallback.map(sanitizePublicVehicle) : []);
 
-        if (bestVehicles.length > 0) {
-          safeSetItem(STORAGE_KEYS.PUBLIC_VEHICLES, JSON.stringify(bestVehicles));
-          safeSetItem(STORAGE_KEYS.VEHICLES, JSON.stringify(bestVehicles));
-        }
+        safeSetItem(STORAGE_KEYS.PUBLIC_VEHICLES, JSON.stringify(bestVehicles));
+        safeSetItem(STORAGE_KEYS.VEHICLES, JSON.stringify(bestVehicles));
         if (remoteStore) {
           const hasPendingLocalStore = getPendingSyncQueue().some(
             op => op.collection === 'store' && op.action === 'upsert'
@@ -2123,7 +2147,7 @@ export const storageService = {
       await this.flushPendingSyncQueue(userRole);
 
       // 2. Equipe autenticada: consulta coleções operacionais; users completo apenas se userRole === 'gestor'
-      const [remoteVehicles, remoteOwners, remoteSales, remoteStore, remoteFinanciers, remoteSalespeople, remoteUsers] = await Promise.all([
+      const [rawRemoteVehicles, rawRemoteOwners, rawRemoteSales, remoteStore, remoteFinanciers, rawRemoteSalespeople, rawRemoteUsers] = await Promise.all([
         firebaseDb.getVehicles(),
         firebaseDb.getOwners(),
         firebaseDb.getSales(),
@@ -2132,6 +2156,17 @@ export const storageService = {
         firebaseDb.getSalespeople(),
         userRole === 'gestor' ? firebaseDb.getUsers() : Promise.resolve([] as SystemUser[])
       ]);
+
+      // Remove automaticamente registros de demonstração legados da nuvem caso tenham sido sincronizados em testes
+      rawRemoteVehicles.filter(v => LEGACY_DEMO_IDS.has(v.id)).forEach(v => firebaseDb.deleteVehicle(v.id).catch(() => {}));
+      rawRemoteSalespeople.filter(s => LEGACY_DEMO_IDS.has(s.id)).forEach(s => firebaseDb.deleteSalesperson(s.id).catch(() => {}));
+      rawRemoteUsers.filter(u => LEGACY_DEMO_IDS.has(u.id)).forEach(u => firebaseDb.deleteUser(u.id).catch(() => {}));
+
+      const remoteVehicles = rawRemoteVehicles.filter(v => !LEGACY_DEMO_IDS.has(v.id));
+      const remoteOwners = rawRemoteOwners.filter(o => !LEGACY_DEMO_IDS.has(o.id));
+      const remoteSales = rawRemoteSales ? rawRemoteSales.filter(s => !LEGACY_DEMO_IDS.has(s.id)) : [];
+      const remoteSalespeople = rawRemoteSalespeople.filter(s => !LEGACY_DEMO_IDS.has(s.id));
+      const remoteUsers = rawRemoteUsers.filter(u => !LEGACY_DEMO_IDS.has(u.id));
 
       // 3. Reconciliação inteligente por versão OCC e timestamp (impede sobrescrita de edições locais mais novas)
       if (remoteVehicles.length > 0) {

@@ -292,7 +292,13 @@ export const VehicleSaleModal: React.FC<VehicleSaleModalProps> = ({
     const sellerObj =
       userRole === 'vendedor' && activeSeller
         ? activeSeller
-        : salespeople.find(s => s.id === vendedorId) || salespeople[0];
+        : salespeople.find(s => s.id === vendedorId) || salespeople[0] || {
+            id: 'user_gestor_master',
+            nome: 'Gestor Geral (Venda Direta)',
+            email: 'admin@vaveiculos.com.br',
+            telefone: '',
+            ativo: true
+          };
     const contractObj = templates.find(t => t.id === tipoContratoId) || defaultContractTemplate;
 
     if (
@@ -525,11 +531,15 @@ export const VehicleSaleModal: React.FC<VehicleSaleModalProps> = ({
                   disabled={userRole === 'vendedor'}
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none disabled:opacity-75"
                 >
-                  {salespeople.map(s => (
-                    <option key={s.id} value={s.id} disabled={s.ativo === false}>
-                      {s.nome}{s.ativo === false ? ' (Desativado)' : ''}
-                    </option>
-                  ))}
+                  {salespeople.length > 0 ? (
+                    salespeople.map(s => (
+                      <option key={s.id} value={s.id} disabled={s.ativo === false}>
+                        {s.nome}{s.ativo === false ? ' (Desativado)' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="user_gestor_master">Gestor Geral (Venda Direta da Loja)</option>
+                  )}
                 </select>
                 {userRole === 'vendedor' && (
                   <span className="text-[10px] text-neutral-500 block mt-0.5">

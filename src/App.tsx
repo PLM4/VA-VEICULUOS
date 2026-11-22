@@ -265,7 +265,7 @@ export default function App() {
 
     // 1. Escuta em tempo real para vitrine pública diretamente no Firestore
     const unsubPublic = firebaseDb.subscribeToPublicVehicles((liveList) => {
-      if (liveList && liveList.length > 0) {
+      if (Array.isArray(liveList)) {
         setPublicVehicles(liveList);
         storageService.savePublicVehicles(liveList);
       }
@@ -275,7 +275,7 @@ export default function App() {
     let unsubVehicles: (() => void) | undefined;
     if (isStaffAuthenticated) {
       unsubVehicles = firebaseDb.subscribeToVehicles((liveList) => {
-        if (liveList && liveList.length > 0) {
+        if (Array.isArray(liveList)) {
           setVehicles(liveList);
           storageService.saveVehicles(liveList);
         }
