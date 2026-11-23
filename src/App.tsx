@@ -30,7 +30,8 @@ import { firebaseAuth, firebaseDb } from './services/firebase';
 import {
   createStaffSession,
   loadVerifiedStaffSession,
-  clearStaffSession
+  clearStaffSession,
+  sanitizePublicVehicle
 } from './utils/security';
 import { 
   Vehicle, FormerOwner, Sale, Financier, 
@@ -263,21 +264,25 @@ export default function App() {
   useEffect(() => {
     refreshData(isStaffAuthenticated, userRole);
 
-    // 1. Escuta em tempo real para vitrine pública diretamente no Firestore
-    const unsubPublic = firebaseDb.subscribeToPublicVehicles((liveList) => {
-      if (liveList && liveList.length > 0) {
-        setPublicVehicles(liveList);
-        storageService.savePublicVehicles(liveList);
-      }
-    });
-
-    // 2. Escuta em tempo real para equipe autenticada
+    // 1. Escuta em tempo real (reconciliada via OCC para nunca sobrescrever cadastros locais pendentes)
+    let unsubPublic: (() => void) | undefined;
     let unsubVehicles: (() => void) | undefined;
+
     if (isStaffAuthenticated) {
+      // Equipe autenticada: vehicles é a fonte autoritativa e atualiza automaticamente a vitrine pública
       unsubVehicles = firebaseDb.subscribeToVehicles((liveList) => {
         if (liveList && liveList.length > 0) {
-          setVehicles(liveList);
-          storageService.saveVehicles(liveList);
+          const merged = storageService.reconcileRemoteVehicles(liveList);
+          setVehicles(merged);
+          setPublicVehicles(merged.map(sanitizePublicVehicle));
+        }
+      });
+    } else {
+      // Visitante anônimo da Vitrine Pública: escuta vehicles_public reconciliada
+      unsubPublic = firebaseDb.subscribeToPublicVehicles((liveList) => {
+        if (liveList && liveList.length > 0) {
+          const merged = storageService.reconcileRemotePublicVehicles(liveList);
+          setPublicVehicles(merged);
         }
       });
     }
@@ -290,7 +295,7 @@ export default function App() {
     });
 
     return () => {
-      unsubPublic();
+      if (unsubPublic) unsubPublic();
       if (unsubVehicles) unsubVehicles();
     };
   }, [isStaffAuthenticated, userRole]);
@@ -521,10 +526,15 @@ export default function App() {
   };
 
   const handleOpenShowroom = () => {
+    setPublicVehicles(storageService.getPublicVehicles());
     setCurrentView('showroom');
     if (typeof window !== 'undefined' && window.history) {
       window.history.pushState({}, '', '/');
     }
+    storageService
+      .syncFromFirestore(isStaffAuthenticated, userRole)
+      .then(() => refreshData(isStaffAuthenticated, userRole))
+      .catch(() => {});
   };
 
   const handleRequestElevateToGestor = () => {
@@ -678,15 +688,6 @@ export default function App() {
             onEnterManagement={handleEnterManagement}
             onRefreshCatalog={async () => {
               try {
-                const [pubList, fullList] = await Promise.all([
-                  firebaseDb.getPublicVehicles(),
-                  firebaseDb.getVehicles()
-                ]);
-                const best = pubList.length > 0 ? pubList : fullList;
-                if (best.length > 0) {
-                  setPublicVehicles(best);
-                  storageService.savePublicVehicles(best);
-                }
                 await storageService.syncFromFirestore(isStaffAuthenticated, userRole);
                 refreshData(isStaffAuthenticated, userRole);
               } catch (err) {
@@ -887,6 +888,8 @@ export default function App() {
               {managementTab === 'users' && userRole === 'gestor' && (
                 <UsersManagementView
                   currentUserRole={userRole}
+                  currentUserName={activeUserName}
+                  usersList={users}
                   store={store}
                   initialSearchTerm={managementTab === 'users' ? activeSearchFilter : ''}
                   onRefreshData={() => refreshData(true, userRole)}

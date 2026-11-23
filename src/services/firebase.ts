@@ -212,6 +212,34 @@ function stripUndefinedFields<T>(value: T): T {
 }
 
 /**
+ * Garante que o documento de veículo não exceda o limite rígido de 1 MB do Firestore
+ * (ex.: quando muitas fotos em base64 são enviadas), preservando o máximo de fotos possível.
+ */
+const FIRESTORE_SAFE_VEHICLE_BYTES = 850_000;
+
+function fitVehicleToFirestoreLimit(vehicle: Vehicle): Vehicle {
+  const photos = Array.isArray(vehicle.fotos) ? [...vehicle.fotos] : [];
+  if (photos.length <= 1) return vehicle;
+
+  const estimateBytes = (obj: Vehicle): number => {
+    try {
+      return new TextEncoder().encode(JSON.stringify(obj)).length;
+    } catch {
+      return JSON.stringify(obj).length * 2;
+    }
+  };
+
+  let candidate: Vehicle = { ...vehicle, fotos: photos };
+  while (candidate.fotos.length > 1 && estimateBytes(candidate) > FIRESTORE_SAFE_VEHICLE_BYTES) {
+    candidate = {
+      ...candidate,
+      fotos: candidate.fotos.slice(0, candidate.fotos.length - 1)
+    };
+  }
+  return candidate;
+}
+
+/**
  * Funções de sincronização do banco de dados VA VEÍCULOS
  */
 export const firebaseDb = {
@@ -250,38 +278,55 @@ export const firebaseDb = {
     try {
       ensureOnlineReady(`vehicles/${vehicle.id}`);
       const timestamp = vehicle.atualizadoEm || new Date().toISOString();
-      const publicProjection = sanitizePublicVehicle(vehicle);
+      const cloudSafeVehicle = fitVehicleToFirestoreLimit(vehicle);
+      const publicProjection = fitVehicleToFirestoreLimit(sanitizePublicVehicle(cloudSafeVehicle));
       const vehicleRef = doc(db, 'vehicles', vehicle.id);
       const publicRef = doc(db, 'vehicles_public', vehicle.id);
 
-      await runTransaction(db, async (tx) => {
-        const remoteSnap = await tx.get(vehicleRef);
-        if (remoteSnap.exists()) {
-          const remoteData = remoteSnap.data() as Partial<Vehicle>;
-          if (
-            typeof vehicle.version === 'number' &&
-            typeof remoteData.version === 'number' &&
-            vehicle.version < remoteData.version
-          ) {
-            throw new ConcurrencyConflictError(
-              `Conflito de concorrência na nuvem para o veículo ${vehicle.placa} (remoto v${remoteData.version} > local v${vehicle.version}).`,
-              vehicle.version,
-              remoteData.version
-            );
-          }
-        }
-
-        tx.set(vehicleRef, stripUndefinedFields({
-          ...vehicle,
-          atualizadoEm: timestamp
-        }), { merge: true });
-
-        tx.set(publicRef, stripUndefinedFields({
-          ...publicProjection,
-          version: vehicle.version,
-          atualizadoEm: timestamp
-        }), { merge: true });
+      const fullPayload = stripUndefinedFields({
+        ...cloudSafeVehicle,
+        atualizadoEm: timestamp
       });
+      const publicPayload = stripUndefinedFields({
+        ...publicProjection,
+        version: cloudSafeVehicle.version,
+        atualizadoEm: timestamp
+      });
+
+      try {
+        await runTransaction(db, async (tx) => {
+          const remoteSnap = await tx.get(vehicleRef);
+          if (remoteSnap.exists()) {
+            const remoteData = remoteSnap.data() as Partial<Vehicle>;
+            if (
+              typeof cloudSafeVehicle.version === 'number' &&
+              typeof remoteData.version === 'number' &&
+              cloudSafeVehicle.version < remoteData.version
+            ) {
+              throw new ConcurrencyConflictError(
+                `Conflito de concorrência na nuvem para o veículo ${cloudSafeVehicle.placa} (remoto v${remoteData.version} > local v${cloudSafeVehicle.version}).`,
+                cloudSafeVehicle.version,
+                remoteData.version
+              );
+            }
+          }
+
+          tx.set(vehicleRef, fullPayload, { merge: true });
+          tx.set(publicRef, publicPayload, { merge: true });
+        });
+      } catch (txErr) {
+        if (txErr instanceof ConcurrencyConflictError) {
+          throw txErr;
+        }
+        // Fallback resiliente caso a transação falhe por contenção ou regra isolada: grava ambas as coleções individualmente
+        const [fullOk, pubOk] = await Promise.all([
+          setDoc(vehicleRef, fullPayload, { merge: true }).then(() => true).catch(() => false),
+          setDoc(publicRef, publicPayload, { merge: true }).then(() => true).catch(() => false)
+        ]);
+        if (!fullOk && !pubOk) {
+          throw txErr;
+        }
+      }
 
       markSyncOnline();
       return true;

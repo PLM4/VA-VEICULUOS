@@ -190,7 +190,13 @@ export const ShowroomView: React.FC<ShowroomViewProps> = ({
       .sort((a, b) => {
         if (sortBy === 'preco_menor') return a.valorAnunciado - b.valorAnunciado;
         if (sortBy === 'preco_maior') return b.valorAnunciado - a.valorAnunciado;
-        if (sortBy === 'ano_novo') return b.anoModelo - a.anoModelo;
+        if (sortBy === 'ano_novo') {
+          const yearDiff = b.anoModelo - a.anoModelo;
+          if (yearDiff !== 0) return yearDiff;
+          const dateA = a.dataEntrada ? Date.parse(a.dataEntrada) : 0;
+          const dateB = b.dataEntrada ? Date.parse(b.dataEntrada) : 0;
+          return dateB - dateA;
+        }
         if (sortBy === 'km_menor') return a.quilometragem - b.quilometragem;
         return 0;
       });

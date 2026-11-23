@@ -1196,15 +1196,19 @@ export const storageService = {
   },
   getPublicVehicles(): Vehicle[] {
     try {
-      const localInternal = safeGetItem(STORAGE_KEYS.VEHICLES);
-      if (localInternal) {
-        const parsed: Vehicle[] = JSON.parse(localInternal);
-        return parsed.map(sanitizePublicVehicle);
-      }
       const cachedPublic = safeGetItem(STORAGE_KEYS.PUBLIC_VEHICLES);
       if (cachedPublic) {
         const parsedPublic: Vehicle[] = JSON.parse(cachedPublic);
-        return parsedPublic.map(sanitizePublicVehicle);
+        if (Array.isArray(parsedPublic)) {
+          return parsedPublic.map(sanitizePublicVehicle);
+        }
+      }
+      const localInternal = safeGetItem(STORAGE_KEYS.VEHICLES);
+      if (localInternal) {
+        const parsed: Vehicle[] = JSON.parse(localInternal);
+        if (Array.isArray(parsed)) {
+          return parsed.map(sanitizePublicVehicle);
+        }
       }
       return SEED_VEHICLES.map(sanitizePublicVehicle);
     } catch {
@@ -1218,6 +1222,33 @@ export const storageService = {
   savePublicVehicles(vehicles: Vehicle[]): void {
     const sanitized = vehicles.map(sanitizePublicVehicle);
     safeSetItem(STORAGE_KEYS.PUBLIC_VEHICLES, JSON.stringify(sanitized));
+  },
+  reconcileRemoteVehicles(remoteList: Vehicle[]): Vehicle[] {
+    if (!Array.isArray(remoteList) || remoteList.length === 0) {
+      return this.getVehicles();
+    }
+    const merged = mergeEntitiesByFreshness(
+      STORAGE_KEYS.VEHICLES,
+      this.getVehicles(),
+      remoteList,
+      'vehicles'
+    );
+    this.saveVehicles(merged);
+    return merged;
+  },
+  reconcileRemotePublicVehicles(remotePublicList: Vehicle[]): Vehicle[] {
+    if (!Array.isArray(remotePublicList) || remotePublicList.length === 0) {
+      return this.getPublicVehicles();
+    }
+    const sanitizedRemote = remotePublicList.map(sanitizePublicVehicle);
+    const merged = mergeEntitiesByFreshness(
+      STORAGE_KEYS.PUBLIC_VEHICLES,
+      this.getPublicVehicles(),
+      sanitizedRemote,
+      'vehicles'
+    );
+    this.savePublicVehicles(merged);
+    return merged;
   },
   addVehicle(vehicle: Vehicle, user = 'Gestor Geral'): void {
     validateVehicleIntegrity(vehicle);
@@ -2090,7 +2121,7 @@ export const storageService = {
   // Sincronização híbrida resiliente com Firebase Firestore (preserva edições offline via OCC / merge por versão)
   async syncFromFirestore(isStaffAuthenticated: boolean = false, userRole: UserRole = 'vendedor'): Promise<{ vehicles: number; owners: number; sales: number }> {
     try {
-      // Visitante anônimo da Vitrine Pública: baixa vehicles_public (ou fallback de vehicles) e perfil público
+      // Visitante anônimo da Vitrine Pública: baixa e combina vehicles_public + vehicles (sanitizados) preservando pendências locais
       if (!isStaffAuthenticated) {
         const [remotePublicVehicles, remoteVehiclesFallback, remoteStore] = await Promise.all([
           firebaseDb.getPublicVehicles(),
@@ -2098,13 +2129,23 @@ export const storageService = {
           firebaseDb.getStoreProfile()
         ]);
 
-        const bestVehicles = remotePublicVehicles.length > 0
-          ? remotePublicVehicles
-          : (remoteVehiclesFallback.length > 0 ? remoteVehiclesFallback.map(sanitizePublicVehicle) : []);
+        // Unifica veículos de vehicles_public e vehicles (sanitizados), mantendo a versão mais recente de cada ID
+        const combinedById = new Map<string, Vehicle>();
+        for (const v of remotePublicVehicles) {
+          combinedById.set(v.id, sanitizePublicVehicle(v));
+        }
+        for (const rawV of remoteVehiclesFallback) {
+          const sanitized = sanitizePublicVehicle(rawV);
+          const existing = combinedById.get(sanitized.id);
+          if (!existing || isLocalEntityNewer(sanitized, existing, false)) {
+            combinedById.set(sanitized.id, sanitized);
+          }
+        }
+        const combinedRemote = Array.from(combinedById.values());
 
-        if (bestVehicles.length > 0) {
-          safeSetItem(STORAGE_KEYS.PUBLIC_VEHICLES, JSON.stringify(bestVehicles));
-          safeSetItem(STORAGE_KEYS.VEHICLES, JSON.stringify(bestVehicles));
+        let finalPublicList = this.getPublicVehicles();
+        if (combinedRemote.length > 0) {
+          finalPublicList = this.reconcileRemotePublicVehicles(combinedRemote);
         }
         if (remoteStore) {
           const hasPendingLocalStore = getPendingSyncQueue().some(
@@ -2116,7 +2157,7 @@ export const storageService = {
         }
 
         return {
-          vehicles: bestVehicles.length > 0 ? bestVehicles.length : this.getPublicVehicles().length,
+          vehicles: finalPublicList.length,
           owners: 0,
           sales: 0
         };

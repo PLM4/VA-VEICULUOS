@@ -20,9 +20,9 @@ export const compressImageFile = async (
   options: CompressionOptions = {}
 ): Promise<string> => {
   const {
-    maxWidth = 1280,
-    maxHeight = 960,
-    quality = 0.82,
+    maxWidth = 960,
+    maxHeight = 720,
+    quality = 0.72,
     mimeType = 'image/jpeg'
   } = options;
 
@@ -106,14 +106,15 @@ export const compressMultipleImages = async (
 
   const filesToProcess = Array.from(files).slice(0, remainingSlots);
   const compressedResults: string[] = [];
+  const projectedTotal = currentCount + filesToProcess.length;
+  const adaptiveOpts: CompressionOptions =
+    projectedTotal > 4
+      ? { maxWidth: 800, maxHeight: 600, quality: 0.65 }
+      : { maxWidth: 960, maxHeight: 720, quality: 0.72 };
 
   for (const file of filesToProcess) {
     try {
-      const compressed = await compressImageFile(file, {
-        maxWidth: 1280,
-        maxHeight: 960,
-        quality: 0.82
-      });
+      const compressed = await compressImageFile(file, adaptiveOpts);
       compressedResults.push(compressed);
     } catch (err) {
       console.warn('Erro ao comprimir imagem individual:', err);
