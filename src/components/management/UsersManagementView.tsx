@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Users, ShieldCheck, UserCheck, Search, 
+  Users, ShieldCheck, UserCheck, UserPlus, Search, 
   KeyRound, Edit2, Trash2, CheckCircle2, 
   AlertCircle, Phone, Mail, Award,
   Eye, EyeOff, X, ShieldAlert
@@ -14,6 +14,8 @@ import { usePaginatedList } from '../../hooks/usePaginatedList';
 
 interface UsersManagementViewProps {
   currentUserRole: UserRole;
+  currentUserName?: string;
+  usersList?: SystemUser[];
   store?: StoreProfile;
   onRefreshData?: () => void;
   initialSearchTerm?: string;
@@ -21,13 +23,23 @@ interface UsersManagementViewProps {
 
 export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   currentUserRole,
+  currentUserName = 'Gestor Geral',
+  usersList,
   onRefreshData,
   initialSearchTerm = ''
 }) => {
-  const [users, setUsers] = useState<SystemUser[]>(() => storageService.getUsers());
+  const [users, setUsers] = useState<SystemUser[]>(() =>
+    usersList && usersList.length > 0 ? usersList : storageService.getUsers()
+  );
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [roleFilter, setRoleFilter] = useState<'todos' | 'gestor' | 'vendedor'>('todos');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'ativos' | 'inativos'>('todos');
+
+  React.useEffect(() => {
+    if (usersList && usersList.length > 0) {
+      setUsers(usersList);
+    }
+  }, [usersList]);
 
   React.useEffect(() => {
     if (initialSearchTerm) {
@@ -44,6 +56,8 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
   const [userToDelete, setUserToDelete] = useState<SystemUser | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [modalError, setModalError] = useState<string>('');
+  const [resetModalError, setResetModalError] = useState<string>('');
 
   // Form State
   const [formNome, setFormNome] = useState('');
@@ -93,6 +107,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     setFormMetaMensal(5);
     setFormAtivo(true);
     setShowPassword(false);
+    setModalError('');
     setIsCreateOrEditOpen(true);
   };
 
@@ -108,45 +123,57 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     setFormMetaMensal(u.metaMensal || 5);
     setFormAtivo(u.ativo);
     setShowPassword(false);
+    setModalError('');
     setIsCreateOrEditOpen(true);
   };
 
   // Submit User Create / Edit
   const handleSaveUserSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setModalError('');
 
     if (!formNome.trim() || !formEmail.trim()) {
-      showNotification('error', 'Nome e E-mail são obrigatórios.');
+      setModalError('Nome e E-mail são obrigatórios.');
       return;
     }
 
     if (formNome.trim().length < 3) {
-      showNotification('error', 'Informe o nome completo do usuário (mínimo 3 caracteres).');
+      setModalError('Informe o nome completo do usuário (mínimo 3 caracteres).');
       return;
     }
 
     if (!isValidEmail(formEmail)) {
-      showNotification('error', 'Por favor, informe um endereço de e-mail corporativo válido.');
+      setModalError('Por favor, informe um endereço de e-mail corporativo válido.');
       return;
     }
 
     if (formTelefone.trim() && !isValidPhone(formTelefone)) {
-      showNotification('error', 'Por favor, informe um WhatsApp válido com DDD (10 ou 11 dígitos).');
+      setModalError('Por favor, informe um WhatsApp válido com DDD (10 ou 11 dígitos).');
       return;
     }
 
     if (formPapel === 'vendedor' && (!Number.isFinite(formMetaMensal) || formMetaMensal < 1 || formMetaMensal > 100)) {
-      showNotification('error', 'A meta mensal deve ser um número entre 1 e 100 veículos.');
+      setModalError('A meta mensal deve ser um número entre 1 e 100 veículos.');
       return;
     }
 
-    if (!editingUser) {
+    // Proteção contra remoção/desativação do último Gestor ativo ao editar
+    if (editingUser && editingUser.papel === 'gestor' && editingUser.ativo && (formPapel !== 'gestor' || !formAtivo)) {
+      const otherActiveManagers = users.filter(u => u.papel === 'gestor' && u.ativo && u.id !== editingUser.id);
+      if (otherActiveManagers.length === 0) {
+        setModalError('Operação negada: O sistema deve possuir pelo menos um Gestor ativo.');
+        return;
+      }
+    }
+
+    const isChangingPasswordOnEdit = Boolean(editingUser && (formSenha.trim().length > 0 || formConfirmSenha.trim().length > 0));
+    if (!editingUser || isChangingPasswordOnEdit) {
       if (formSenha.trim().length < 6 || formSenha.length > 64) {
-        showNotification('error', 'A senha de acesso deve conter entre 6 e 64 caracteres.');
+        setModalError('A senha de acesso deve conter entre 6 e 64 caracteres.');
         return;
       }
       if (formSenha !== formConfirmSenha) {
-        showNotification('error', 'A senha e a confirmação de senha não coincidem.');
+        setModalError('A senha e a confirmação de senha não coincidem.');
         return;
       }
     }
@@ -155,7 +182,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     const emailLower = formEmail.trim().toLowerCase();
     const duplicate = users.find(u => u.email.toLowerCase() === emailLower && u.id !== editingUser?.id);
     if (duplicate) {
-      showNotification('error', `O e-mail "${formEmail}" já está cadastrado para o usuário ${duplicate.nome}.`);
+      setModalError(`O e-mail "${formEmail}" já está cadastrado para o usuário ${duplicate.nome}.`);
       return;
     }
 
@@ -167,14 +194,14 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       email: emailLower,
       telefone: formTelefone.trim(),
       papel: formPapel,
-      senha: editingUser ? editingUser.senha : formSenha.trim(),
+      senha: editingUser ? (isChangingPasswordOnEdit ? formSenha.trim() : editingUser.senha) : formSenha.trim(),
       ativo: formAtivo,
       metaMensal: formPapel === 'vendedor' ? formMetaMensal : undefined,
       dataCriacao: editingUser ? editingUser.dataCriacao : new Date().toISOString(),
       ultimoAcesso: editingUser?.ultimoAcesso
     };
 
-    storageService.saveUser(userObj, 'Gestor Geral');
+    storageService.saveUser(userObj, currentUserName);
     refreshList();
     setIsCreateOrEditOpen(false);
     showNotification('success', editingUser ? `Usuário "${userObj.nome}" atualizado com sucesso!` : `Novo ${userObj.papel === 'gestor' ? 'Gestor' : 'Vendedor'} cadastrado com sucesso!`);
@@ -182,7 +209,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
   // Toggle Active/Inactive
   const handleToggleStatus = (u: SystemUser) => {
-    const res = storageService.toggleUserStatus(u.id, 'Gestor Geral');
+    const res = storageService.toggleUserStatus(u.id, currentUserName);
     if (!res.success) {
       showNotification('error', res.error || 'Erro ao alterar status.');
       return;
@@ -194,7 +221,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   // Delete User
   const handleConfirmDelete = () => {
     if (!userToDelete) return;
-    const res = storageService.deleteUser(userToDelete.id, 'Gestor Geral');
+    const res = storageService.deleteUser(userToDelete.id, currentUserName);
     if (!res.success) {
       showNotification('error', res.error || 'Erro ao excluir usuário.');
     } else {
@@ -207,14 +234,15 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   // Password Reset
   const handleResetPasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setResetModalError('');
     if (!userForPasswordReset) return;
 
     if (newPassword.trim().length < 6 || newPassword.length > 64) {
-      showNotification('error', 'A nova senha deve conter entre 6 e 64 caracteres.');
+      setResetModalError('A nova senha deve conter entre 6 e 64 caracteres.');
       return;
     }
     if (newPassword !== confirmNewPassword) {
-      showNotification('error', 'As senhas não coincidem.');
+      setResetModalError('As senhas não coincidem.');
       return;
     }
 
@@ -223,7 +251,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       senha: newPassword.trim()
     };
 
-    storageService.saveUser(updatedUser, 'Gestor Geral');
+    storageService.saveUser(updatedUser, currentUserName);
     refreshList();
     setIsResetPasswordOpen(false);
     setUserForPasswordReset(null);
@@ -272,10 +300,12 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
         breadcrumb="Administração • Controle de Acessos"
         title="Gestão de Usuários & Equipe"
         subtitle="Cadastre novos gestores ou vendedores, configure credenciais de login, senhas e controle o acesso ao sistema."
-        action={
+        primaryAction={
           currentUserRole === 'gestor' ? {
-            label: '+ Cadastrar Novo Usuário',
-            onClick: handleOpenCreateModal
+            label: 'Adicionar Usuário',
+            icon: UserPlus,
+            onClick: handleOpenCreateModal,
+            id: 'users-btn-add-user'
           } : undefined
         }
       />
@@ -483,6 +513,8 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       setUserForPasswordReset(u);
                       setNewPassword('');
                       setConfirmNewPassword('');
+                      setShowNewPassword(false);
+                      setResetModalError('');
                       setIsResetPasswordOpen(true);
                     }}
                     className="p-1.5 rounded-[6px] bg-[#202024] hover:bg-[#2D2D32] text-[#CAC9CA] hover:text-white transition-colors cursor-pointer"
@@ -520,12 +552,24 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       </div>
 
       {pagination.totalItems === 0 && (
-        <div className="p-12 text-center bg-[#17171A] border border-[#2D2D32] rounded-[14px]">
-          <Users className="w-10 h-10 text-[#68686E] mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-[#F5F5F5]">Nenhum usuário encontrado</h3>
-          <p className="text-xs text-[#A7A7AB] mt-1">
-            Tente ajustar os filtros de busca ou cadastre um novo usuário clicando no botão acima.
-          </p>
+        <div className="p-12 text-center bg-[#17171A] border border-[#2D2D32] rounded-[14px] space-y-3">
+          <Users className="w-10 h-10 text-[#68686E] mx-auto" />
+          <div>
+            <h3 className="text-sm font-bold text-[#F5F5F5]">Nenhum usuário encontrado</h3>
+            <p className="text-xs text-[#A7A7AB] mt-1">
+              Tente ajustar os filtros de busca ou cadastre um novo usuário clicando no botão abaixo.
+            </p>
+          </div>
+          {currentUserRole === 'gestor' && (
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-[10px] bg-[#D4130D] hover:bg-[#E3271F] text-xs font-bold text-white transition-colors cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              Adicionar Usuário
+            </button>
+          )}
         </div>
       )}
 
@@ -580,6 +624,13 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
             {/* Modal Form */}
             <form onSubmit={handleSaveUserSubmit} className="p-6 space-y-4">
               
+              {modalError && (
+                <div className="p-3 rounded-[10px] bg-[#D4130D]/10 border border-[#D4130D]/30 flex items-start gap-2 text-xs text-[#F87171]">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#D4130D]" />
+                  <span>{modalError}</span>
+                </div>
+              )}
+
               {/* Papel Selector */}
               <div className="space-y-1.5">
                 <label className={formStyles.label}>Perfil de Acesso *</label>
@@ -658,45 +709,56 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                 />
               </div>
 
-              {/* Senha e Confirmação (Se novo usuário) */}
-              {!editingUser && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div className="space-y-1">
-                    <label className={formStyles.label}>Senha de Acesso *</label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        maxLength={64}
-                        value={formSenha}
-                        onChange={(e) => setFormSenha(e.target.value)}
-                        placeholder="••••"
-                        className={`${formStyles.input} pr-8`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A7A7AB] hover:text-white"
-                      >
-                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className={formStyles.label}>Confirmar Senha *</label>
+              {/* Senha e Confirmação (Obrigatória no cadastro; opcional na edição) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1">
+                  <label className={formStyles.label}>
+                    {editingUser ? 'Nova Senha (Opcional)' : 'Senha de Acesso *'}
+                  </label>
+                  <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
-                      required
+                      required={!editingUser}
+                      minLength={!editingUser ? 6 : undefined}
                       maxLength={64}
-                      value={formConfirmSenha}
-                      onChange={(e) => setFormConfirmSenha(e.target.value)}
-                      placeholder="••••"
-                      className={formStyles.input}
+                      value={formSenha}
+                      onChange={(e) => {
+                        setFormSenha(e.target.value);
+                        if (modalError) setModalError('');
+                      }}
+                      placeholder={editingUser ? 'Deixe vazio p/ manter' : 'Mínimo 6 caracteres'}
+                      className={`${formStyles.input} pr-8`}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A7A7AB] hover:text-white cursor-pointer"
+                      title={showPassword ? 'Ocultar senha' : 'Exibir senha'}
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                 </div>
-              )}
+
+                <div className="space-y-1">
+                  <label className={formStyles.label}>
+                    {editingUser ? 'Confirmar Nova Senha' : 'Confirmar Senha *'}
+                  </label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required={!editingUser || formSenha.trim().length > 0}
+                    minLength={!editingUser ? 6 : undefined}
+                    maxLength={64}
+                    value={formConfirmSenha}
+                    onChange={(e) => {
+                      setFormConfirmSenha(e.target.value);
+                      if (modalError) setModalError('');
+                    }}
+                    placeholder={editingUser ? 'Repita a nova senha' : 'Repita a senha'}
+                    className={formStyles.input}
+                  />
+                </div>
+              </div>
 
               {/* Meta Mensal (Apenas se Vendedor) */}
               {formPapel === 'vendedor' && (
@@ -770,6 +832,13 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
             </div>
 
             <form onSubmit={handleResetPasswordSubmit} className="p-6 space-y-4">
+              {resetModalError && (
+                <div className="p-3 rounded-[10px] bg-[#D4130D]/10 border border-[#D4130D]/30 flex items-start gap-2 text-xs text-[#F87171]">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#D4130D]" />
+                  <span>{resetModalError}</span>
+                </div>
+              )}
+
               <p className="text-xs text-[#CAC9CA]">
                 Informe a nova senha para o usuário <strong className="text-white">{userForPasswordReset.nome}</strong>:
               </p>
@@ -780,16 +849,20 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                   <input
                     type={showNewPassword ? 'text' : 'password'}
                     required
+                    minLength={6}
                     maxLength={64}
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="••••"
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      if (resetModalError) setResetModalError('');
+                    }}
+                    placeholder="Mínimo 6 caracteres"
                     className={`${formStyles.input} pr-8`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A7A7AB] hover:text-white"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A7A7AB] hover:text-white cursor-pointer"
                   >
                     {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
@@ -801,10 +874,14 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                 <input
                   type={showNewPassword ? 'text' : 'password'}
                   required
+                  minLength={6}
                   maxLength={64}
                   value={confirmNewPassword}
-                  onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  placeholder="••••"
+                  onChange={(e) => {
+                    setConfirmNewPassword(e.target.value);
+                    if (resetModalError) setResetModalError('');
+                  }}
+                  placeholder="Repita a nova senha"
                   className={formStyles.input}
                 />
               </div>
