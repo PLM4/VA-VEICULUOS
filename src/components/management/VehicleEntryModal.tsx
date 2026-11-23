@@ -88,10 +88,9 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
   }, [vehicles]);
   
   // Fotos (upload até 10 fotos)
+  const DEFAULT_PLACEHOLDER_PHOTO = 'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=1200&q=80';
   const [fotoUrl, setFotoUrl] = useState('');
-  const [fotosList, setFotosList] = useState<string[]>([
-    'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=1200&q=80'
-  ]);
+  const [fotosList, setFotosList] = useState<string[]>([DEFAULT_PLACEHOLDER_PHOTO]);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
 
   // Step 3: Financials & DETRAN (com máscaras R$)
@@ -114,8 +113,13 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
 
     try {
       setIsUploadingPhotos(true);
-      const compressed = await compressMultipleImages(files, 10, fotosList.length);
-      setFotosList(prev => [...prev, ...compressed].slice(0, 10));
+      const isOnlyDefaultPlaceholder =
+        fotosList.length === 1 && fotosList[0] === DEFAULT_PLACEHOLDER_PHOTO;
+      const baseList = isOnlyDefaultPlaceholder ? [] : fotosList;
+      const compressed = await compressMultipleImages(files, 10, baseList.length);
+      if (compressed.length > 0) {
+        setFotosList([...baseList, ...compressed].slice(0, 10));
+      }
     } catch (err) {
       console.error('Erro ao comprimir fotos:', err);
     } finally {

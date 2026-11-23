@@ -88,22 +88,6 @@ function reclaimStorageQuota(): void {
   } catch {
     // Ignora falha durante limpeza preventiva de logs
   }
-
-  try {
-    const rawPublic = localStorage.getItem(STORAGE_KEYS.PUBLIC_VEHICLES);
-    if (rawPublic) {
-      const parsedPublic: Vehicle[] = JSON.parse(rawPublic);
-      if (Array.isArray(parsedPublic)) {
-        const compacted = parsedPublic.map(v => ({
-          ...v,
-          fotos: Array.isArray(v.fotos) ? v.fotos.slice(0, 1) : []
-        }));
-        localStorage.setItem(STORAGE_KEYS.PUBLIC_VEHICLES, JSON.stringify(compacted));
-      }
-    }
-  } catch {
-    // Ignora falha durante compactação de miniaturas públicas
-  }
 }
 
 function safeGetItem(key: string): string | null {

@@ -18,6 +18,7 @@ import {
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Vehicle, FormerOwner, Sale, StoreProfile, AuditLog, ContractTemplate, Financier, Salesperson, SystemUser } from '../types';
 import { hashPassword, isHashedPassword, sanitizePublicVehicle } from '../utils/security';
+import { recompressDataUrlToBudget } from '../utils/imageCompressor';
 
 export class ConcurrencyConflictError extends Error {
   public readonly code = 'CONCURRENCY_CONFLICT';
@@ -212,25 +213,53 @@ function stripUndefinedFields<T>(value: T): T {
 }
 
 /**
- * Garante que o documento de veículo não exceda o limite rígido de 1 MB do Firestore
- * (ex.: quando muitas fotos em base64 são enviadas), preservando o máximo de fotos possível.
+ * Garante que o documento de veículo caiba no limite rígido de 1 MB do Firestore
+ * preservando TODAS as 10 fotos (recompressão adaptativa em vez de descartar fotos).
  */
 const FIRESTORE_SAFE_VEHICLE_BYTES = 850_000;
 
-function fitVehicleToFirestoreLimit(vehicle: Vehicle): Vehicle {
-  const photos = Array.isArray(vehicle.fotos) ? [...vehicle.fotos] : [];
-  if (photos.length <= 1) return vehicle;
+function estimateVehicleBytes(obj: Vehicle): number {
+  try {
+    return new TextEncoder().encode(JSON.stringify(obj)).length;
+  } catch {
+    return JSON.stringify(obj).length * 2;
+  }
+}
 
-  const estimateBytes = (obj: Vehicle): number => {
-    try {
-      return new TextEncoder().encode(JSON.stringify(obj)).length;
-    } catch {
-      return JSON.stringify(obj).length * 2;
-    }
-  };
+async function fitVehicleToFirestoreLimit(vehicle: Vehicle): Promise<Vehicle> {
+  const photos = Array.isArray(vehicle.fotos) ? [...vehicle.fotos] : [];
+  if (photos.length === 0) return vehicle;
 
   let candidate: Vehicle = { ...vehicle, fotos: photos };
-  while (candidate.fotos.length > 1 && estimateBytes(candidate) > FIRESTORE_SAFE_VEHICLE_BYTES) {
+  if (estimateVehicleBytes(candidate) <= FIRESTORE_SAFE_VEHICLE_BYTES) {
+    return candidate;
+  }
+
+  // 1. Recomprime proporcionalmente cada foto base64 para que TODAS as fotos (até 10) caibam no documento
+  const baseDocBytes = estimateVehicleBytes({ ...vehicle, fotos: [] });
+  const dataUrlIndices = photos
+    .map((p, idx) => (typeof p === 'string' && p.startsWith('data:image/') ? idx : -1))
+    .filter(idx => idx >= 0);
+
+  if (dataUrlIndices.length > 0) {
+    const fixedUrlsBytes = photos
+      .filter(p => typeof p === 'string' && !p.startsWith('data:image/'))
+      .reduce((acc, u) => acc + u.length + 4, 0);
+    const availableForPhotos = Math.max(120_000, FIRESTORE_SAFE_VEHICLE_BYTES - baseDocBytes - fixedUrlsBytes - 15_000);
+    const budgetPerPhoto = Math.max(24_000, Math.floor(availableForPhotos / dataUrlIndices.length));
+
+    const recompressedPhotos = await Promise.all(
+      photos.map(p =>
+        typeof p === 'string' && p.startsWith('data:image/')
+          ? recompressDataUrlToBudget(p, budgetPerPhoto)
+          : Promise.resolve(p)
+      )
+    );
+    candidate = { ...vehicle, fotos: recompressedPhotos };
+  }
+
+  // 2. Fallback extremo caso o ambiente não suporte Canvas e o payload ainda ultrapasse 940 KB
+  while (candidate.fotos.length > 1 && estimateVehicleBytes(candidate) > 940_000) {
     candidate = {
       ...candidate,
       fotos: candidate.fotos.slice(0, candidate.fotos.length - 1)
@@ -278,8 +307,8 @@ export const firebaseDb = {
     try {
       ensureOnlineReady(`vehicles/${vehicle.id}`);
       const timestamp = vehicle.atualizadoEm || new Date().toISOString();
-      const cloudSafeVehicle = fitVehicleToFirestoreLimit(vehicle);
-      const publicProjection = fitVehicleToFirestoreLimit(sanitizePublicVehicle(cloudSafeVehicle));
+      const cloudSafeVehicle = await fitVehicleToFirestoreLimit(vehicle);
+      const publicProjection = await fitVehicleToFirestoreLimit(sanitizePublicVehicle(cloudSafeVehicle));
       const vehicleRef = doc(db, 'vehicles', vehicle.id);
       const publicRef = doc(db, 'vehicles_public', vehicle.id);
 
@@ -323,7 +352,7 @@ export const firebaseDb = {
           setDoc(vehicleRef, fullPayload, { merge: true }).then(() => true).catch(() => false),
           setDoc(publicRef, publicPayload, { merge: true }).then(() => true).catch(() => false)
         ]);
-        if (!fullOk && !pubOk) {
+        if (!fullOk || !pubOk) {
           throw txErr;
         }
       }
