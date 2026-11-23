@@ -5,7 +5,7 @@ import {
   ArrowUpRight, Plus, X
 } from 'lucide-react';
 import { FormerOwner, Vehicle, Sale, UserRole } from '../../types';
-import { formatCurrency, maskCPF, maskPhone, isValidCPF, isValidPhone } from '../../utils/formatters';
+import { formatCurrency, maskCPForCNPJ, maskPhone, isValidCPForCNPJ, isValidPhone, getDocLabel } from '../../utils/formatters';
 import { PageHeader, KpiCard, formStyles } from '../common/DesignSystem';
 
 interface OwnersViewProps {
@@ -48,19 +48,19 @@ export const OwnersView: React.FC<OwnersViewProps> = ({
   const handleCreateOwner = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim() || !cpf.trim() || !endereco.trim()) {
-      alert('Preencha os campos obrigatórios: Nome Completo, CPF e Endereço.');
+      alert('Preencha os campos obrigatórios: Nome/Razão Social, CPF/CNPJ e Endereço.');
       return;
     }
 
-    if (!isValidCPF(cpf)) {
-      alert('Por favor, informe um CPF válido com 11 dígitos.');
+    if (!isValidCPForCNPJ(cpf)) {
+      alert('Por favor, informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.');
       return;
     }
 
     const cleanInputCpf = cpf.replace(/\D/g, '');
     const duplicate = owners.find(o => o.cpf.replace(/\D/g, '') === cleanInputCpf);
     if (duplicate) {
-      alert(`Este CPF já está cadastrado para "${duplicate.nome}".`);
+      alert(`Este CPF/CNPJ já está cadastrado para "${duplicate.nome}".`);
       return;
     }
 
@@ -72,7 +72,7 @@ export const OwnersView: React.FC<OwnersViewProps> = ({
     const newOwner: FormerOwner = {
       id: 'owner_' + Date.now(),
       nome: nome.trim(),
-      cpf: maskCPF(cpf),
+      cpf: maskCPForCNPJ(cpf),
       telefone: telefone ? maskPhone(telefone) : '(83) 99999-0000',
       endereco: endereco.trim(),
       observacoes: observacoes ? observacoes.trim() : undefined,
@@ -164,14 +164,14 @@ export const OwnersView: React.FC<OwnersViewProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={formStyles.label}>CPF *</label>
+                    <label className={formStyles.label}>CPF ou CNPJ *</label>
                     <input
                       type="text"
                       required
-                      maxLength={14}
+                      maxLength={18}
                       value={cpf}
-                      onChange={(e) => setCpf(maskCPF(e.target.value))}
-                      placeholder="000.000.000-00"
+                      onChange={(e) => setCpf(maskCPForCNPJ(e.target.value))}
+                      placeholder="000.000.000-00 ou 00.000.000/0001-00"
                       className={`${formStyles.input} font-mono`}
                     />
                   </div>
@@ -244,7 +244,7 @@ export const OwnersView: React.FC<OwnersViewProps> = ({
             maxLength={100}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por nome, CPF, telefone ou cidade..."
+            placeholder="Buscar por nome, CPF/CNPJ, telefone ou cidade..."
             className="w-full bg-[#202024] border border-[#343439] rounded-[8px] pl-9 pr-4 py-2 text-xs sm:text-sm text-[#F5F5F5] placeholder-[#68686E] focus:outline-none focus:border-[#D4130D]"
           />
         </div>
@@ -287,7 +287,7 @@ export const OwnersView: React.FC<OwnersViewProps> = ({
                         {owner.nome}
                       </h4>
                       <p className="text-xs font-mono text-[#A7A7AB]">
-                        CPF: {owner.cpf}
+                        {getDocLabel(owner.cpf)}: {owner.cpf}
                       </p>
                     </div>
                     <div className="w-8 h-8 rounded-full bg-[#202024] border border-[#2D2D32] flex items-center justify-center shrink-0">

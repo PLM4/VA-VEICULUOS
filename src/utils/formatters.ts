@@ -138,6 +138,37 @@ export function isValidCNPJ(cnpj: string): boolean {
 }
 
 /**
+ * Máscara mista dinâmica para CPF (até 11 dígitos) ou CNPJ (12 a 14 dígitos)
+ */
+export function maskCPForCNPJ(value: string): string {
+  if (!value) return '';
+  const digits = value.replace(/\D/g, '').slice(0, 14);
+  if (digits.length <= 11) {
+    return maskCPF(digits);
+  }
+  return maskCNPJ(digits);
+}
+
+/**
+ * Validação mista rigorosa: aceita CPF válido (11 dígitos) ou CNPJ válido (14 dígitos)
+ */
+export function isValidCPForCNPJ(value: string): boolean {
+  if (!value) return false;
+  const clean = value.replace(/\D/g, '');
+  if (clean.length === 11) return isValidCPF(clean);
+  if (clean.length === 14) return isValidCNPJ(clean);
+  return false;
+}
+
+/**
+ * Retorna o rótulo adequado ("CPF" ou "CNPJ") com base no documento informado
+ */
+export function getDocLabel(value?: string): 'CPF' | 'CNPJ' {
+  const clean = String(value || '').replace(/\D/g, '');
+  return clean.length === 14 ? 'CNPJ' : 'CPF';
+}
+
+/**
  * Máscara de Telefone / WhatsApp com suporte a fixo (10 dígitos) e celular (11 dígitos)
  * Ex: (83) 98765-4321
  */

@@ -7,8 +7,8 @@ import {
 import { FormerOwner, Vehicle, Sale, StoreProfile, UserRole } from '../../types';
 import {
   formatCurrency, formatDate,
-  maskCPF, maskPhone, maskCEP, maskUF,
-  isValidCPF, isValidPhone, isValidCEP, isValidUF
+  maskCPForCNPJ, maskPhone, maskCEP, maskUF,
+  isValidCPForCNPJ, isValidPhone, isValidCEP, isValidUF, getDocLabel
 } from '../../utils/formatters';
 import { sanitizeInputText } from '../../utils/security';
 import { PaginationControls } from '../common/PaginationControls';
@@ -181,7 +181,7 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
 
   const handleOpenEdit = (person: FormerOwner) => {
     setFormNome(person.nome);
-    setFormCpf(maskCPF(person.cpf));
+    setFormCpf(maskCPForCNPJ(person.cpf));
     setFormRg(person.rg || '');
     setFormTelefone(maskPhone(person.telefone));
     setFormEndereco(person.endereco);
@@ -216,8 +216,8 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
       setFormError('Por favor, informe o nome completo válido da pessoa (mínimo de 3 caracteres).');
       return;
     }
-    if (!formCpf.trim() || !isValidCPF(formCpf)) {
-      setFormError('Informe um CPF válido com 11 dígitos.');
+    if (!formCpf.trim() || !isValidCPForCNPJ(formCpf)) {
+      setFormError('Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.');
       return;
     }
     const cleanInputCpf = formCpf.replace(/\D/g, '');
@@ -226,7 +226,7 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
       o => o.id !== currentId && o.cpf.replace(/\D/g, '') === cleanInputCpf
     );
     if (duplicateCpfOwner) {
-      setFormError(`Já existe um cadastro registrado com este CPF (${duplicateCpfOwner.nome}).`);
+      setFormError(`Já existe um cadastro registrado com este CPF/CNPJ (${duplicateCpfOwner.nome}).`);
       return;
     }
     if (!formTelefone.trim() || !isValidPhone(formTelefone)) {
@@ -250,7 +250,7 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
     const ownerToSave: FormerOwner = {
       id: isEditingPerson && selectedPersonForDetail ? selectedPersonForDetail.id : 'owner_' + Date.now(),
       nome: cleanNome,
-      cpf: maskCPF(formCpf),
+      cpf: maskCPForCNPJ(formCpf),
       rg: sanitizeInputText(formRg),
       telefone: maskPhone(formTelefone),
       endereco: cleanEndereco,
@@ -307,7 +307,7 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
             maxLength={100}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por Nome, CPF, Telefone ou Cidade..."
+            placeholder="Buscar por Nome, CPF/CNPJ, Telefone ou Cidade..."
             className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500 transition-colors"
           />
           {searchTerm && (
@@ -348,7 +348,7 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
                         {person.nome}
                       </h3>
                       <p className="text-neutral-400 text-xs font-mono mt-0.5">
-                        CPF: {person.cpf}
+                        {getDocLabel(person.cpf)}: {person.cpf}
                       </p>
                     </div>
                     <span className="text-[10px] uppercase font-bold text-neutral-400 bg-neutral-950 px-2 py-1 rounded border border-neutral-800">
@@ -445,7 +445,7 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
                     {selectedPersonForDetail.nome}
                   </h3>
                   <p className="text-xs text-neutral-400 font-mono">
-                    CPF: {selectedPersonForDetail.cpf} · {selectedPersonForDetail.cidade || 'Areial'} - {selectedPersonForDetail.estado || 'PB'}
+                    {getDocLabel(selectedPersonForDetail.cpf)}: {selectedPersonForDetail.cpf} · {selectedPersonForDetail.cidade || 'Areial'} - {selectedPersonForDetail.estado || 'PB'}
                   </p>
                 </div>
               </div>
@@ -660,14 +660,14 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-neutral-400 font-semibold mb-1">CPF (11 dígitos) *</label>
+                  <label className="block text-neutral-400 font-semibold mb-1">CPF ou CNPJ *</label>
                   <input
                     type="text"
                     required
-                    maxLength={14}
+                    maxLength={18}
                     value={formCpf}
-                    onChange={(e) => setFormCpf(maskCPF(e.target.value))}
-                    placeholder="000.000.000-00"
+                    onChange={(e) => setFormCpf(maskCPForCNPJ(e.target.value))}
+                    placeholder="000.000.000-00 ou 00.000.000/0001-00"
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono"
                   />
                 </div>

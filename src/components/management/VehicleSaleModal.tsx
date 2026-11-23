@@ -10,7 +10,7 @@ import {
 import { 
   formatCurrency, computeAcquisitionCost, 
   computePatioExpenses, computePreSaleTotalCost, computeMarginPercent,
-  maskCPF, maskPhone, isValidCPF, isValidPhone,
+  maskCPForCNPJ, maskPhone, isValidCPForCNPJ, isValidPhone,
   toCents, fromCents, roundCurrency, clampNumber, validateSaleFinancials
 } from '../../utils/formatters';
 import { sanitizeInputText } from '../../utils/security';
@@ -220,7 +220,7 @@ export const VehicleSaleModal: React.FC<VehicleSaleModalProps> = ({
     }
 
     if (!clienteNome.trim() || !clienteCpf.trim() || !clienteEndereco.trim()) {
-      alert('Por favor, preencha os dados cadastrais do cliente comprador (Nome, CPF e Endereço).');
+      alert('Por favor, preencha os dados cadastrais do cliente comprador (Nome/Razão Social, CPF/CNPJ e Endereço).');
       return;
     }
 
@@ -229,8 +229,8 @@ export const VehicleSaleModal: React.FC<VehicleSaleModalProps> = ({
       return;
     }
 
-    if (!isValidCPF(clienteCpf)) {
-      alert('Por favor, informe um CPF válido com 11 dígitos para o cliente comprador.');
+    if (!isValidCPForCNPJ(clienteCpf)) {
+      alert('Por favor, informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido para o cliente comprador.');
       return;
     }
 
@@ -313,7 +313,7 @@ export const VehicleSaleModal: React.FC<VehicleSaleModalProps> = ({
 
     const isPendingCommission = userRole !== 'gestor';
     const safeClienteNome = sanitizeInputText(clienteNome);
-    const safeClienteCpf = sanitizeInputText(maskCPF(clienteCpf));
+    const safeClienteCpf = sanitizeInputText(maskCPForCNPJ(clienteCpf));
     const safeClienteTelefone = sanitizeInputText(maskPhone(clienteTelefone));
     const safeClienteEndereco = sanitizeInputText(clienteEndereco);
     const safeObservacoes = sanitizeInputText(observacoes, true);
@@ -475,14 +475,14 @@ export const VehicleSaleModal: React.FC<VehicleSaleModalProps> = ({
               </div>
 
               <div>
-                <label className="text-xs text-neutral-400 block mb-1">CPF do Comprador *</label>
+                <label className="text-xs text-neutral-400 block mb-1">CPF ou CNPJ do Comprador *</label>
                 <input
                   type="text"
                   required
-                  maxLength={14}
+                  maxLength={18}
                   value={clienteCpf}
-                  onChange={(e) => setClienteCpf(maskCPF(e.target.value))}
-                  placeholder="000.000.000-00"
+                  onChange={(e) => setClienteCpf(maskCPForCNPJ(e.target.value))}
+                  placeholder="000.000.000-00 ou 00.000.000/0001-00"
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none font-mono"
                 />
               </div>

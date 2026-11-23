@@ -10,10 +10,10 @@ import {
 } from '../../types';
 import { 
   formatCurrency, maskCurrency, unmaskCurrency, 
-  maskCPF, maskPhone, maskCEP, maskPlate, maskRenavam, 
+  maskCPForCNPJ, maskPhone, maskCEP, maskPlate, maskRenavam, 
   maskUF, maskChassi, maskDigits,
-  isValidCPF, isValidPhone, isValidCEP, isValidPlate, isValidRenavam,
-  isValidUF, isValidChassi, isValidVehicleYears,
+  isValidCPForCNPJ, isValidPhone, isValidCEP, isValidPlate, isValidRenavam,
+  isValidUF, isValidChassi, isValidVehicleYears, getDocLabel,
   normalizePlate, roundCurrency, toCents, fromCents
 } from '../../utils/formatters';
 import { compressMultipleImages } from '../../utils/imageCompressor';
@@ -161,17 +161,17 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
 
     if (isCreatingNewOwner) {
       if (!newOwner.nome.trim() || !newOwner.cpf.trim() || !newOwner.endereco.trim()) {
-        alert('Por favor preencha Nome Completo, CPF e Endereço do antigo dono.');
+        alert('Por favor preencha Nome/Razão Social, CPF/CNPJ e Endereço do antigo dono.');
         return;
       }
-      if (!isValidCPF(newOwner.cpf)) {
-        alert('O CPF do antigo dono é inválido.');
+      if (!isValidCPForCNPJ(newOwner.cpf)) {
+        alert('O CPF (11 dígitos) ou CNPJ (14 dígitos) do antigo dono é inválido.');
         return;
       }
       const cleanNewCpf = newOwner.cpf.replace(/\D/g, '');
       const existingCpfOwner = owners.find(o => o.cpf.replace(/\D/g, '') === cleanNewCpf);
       if (existingCpfOwner) {
-        alert(`Este CPF já pertence a "${existingCpfOwner.nome}". Selecione-o na lista existente.`);
+        alert(`Este CPF/CNPJ já pertence a "${existingCpfOwner.nome}". Selecione-o na lista existente.`);
         return;
       }
       if (!newOwner.telefone.trim() || !isValidPhone(newOwner.telefone)) {
@@ -276,7 +276,7 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
       const createdOwner: FormerOwner = {
         id: 'owner_' + Date.now(),
         nome: newOwner.nome.trim(),
-        cpf: maskCPF(newOwner.cpf),
+        cpf: maskCPForCNPJ(newOwner.cpf),
         rg: newOwner.rg.trim(),
         telefone: maskPhone(newOwner.telefone),
         endereco: newOwner.endereco.trim(),
@@ -409,7 +409,7 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
                 >
                   {owners.map((owner) => (
                     <option key={owner.id} value={owner.id}>
-                      {owner.nome} — CPF: {owner.cpf} ({owner.cidade || 'Areial'}/{owner.estado || 'PB'})
+                      {owner.nome} — {getDocLabel(owner.cpf)}: {owner.cpf} ({owner.cidade || 'Areial'}/{owner.estado || 'PB'})
                     </option>
                   ))}
                 </select>
@@ -430,14 +430,14 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs text-neutral-400 block mb-1">CPF (11 dígitos) *</label>
+                  <label className="text-xs text-neutral-400 block mb-1">CPF ou CNPJ *</label>
                   <input
                     type="text"
                     required
-                    maxLength={14}
+                    maxLength={18}
                     value={newOwner.cpf}
-                    onChange={(e) => setNewOwner({ ...newOwner, cpf: maskCPF(e.target.value) })}
-                    placeholder="000.000.000-00"
+                    onChange={(e) => setNewOwner({ ...newOwner, cpf: maskCPForCNPJ(e.target.value) })}
+                    placeholder="000.000.000-00 ou 00.000.000/0001-00"
                     className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none font-mono"
                   />
                 </div>
