@@ -39,7 +39,7 @@ export const OwnersView: React.FC<OwnersViewProps> = ({
       return (
         o.nome.toLowerCase().includes(q) ||
         o.cpf.toLowerCase().includes(q) ||
-        o.endereco.toLowerCase().includes(q) ||
+        (o.endereco || '').toLowerCase().includes(q) ||
         o.telefone.toLowerCase().includes(q)
       );
     });
@@ -47,8 +47,8 @@ export const OwnersView: React.FC<OwnersViewProps> = ({
 
   const handleCreateOwner = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !cpf.trim() || !endereco.trim()) {
-      alert('Preencha os campos obrigatórios: Nome/Razão Social, CPF/CNPJ e Endereço.');
+    if (!nome.trim() || !cpf.trim()) {
+      alert('Preencha os campos obrigatórios: Nome/Razão Social e CPF/CNPJ.');
       return;
     }
 
@@ -190,14 +190,13 @@ export const OwnersView: React.FC<OwnersViewProps> = ({
                 </div>
 
                 <div>
-                  <label className={formStyles.label}>Endereço Completo com CEP *</label>
+                  <label className={formStyles.label}>Endereço Completo com CEP (Opcional)</label>
                   <input
                     type="text"
-                    required
                     maxLength={200}
                     value={endereco}
                     onChange={(e) => setEndereco(e.target.value)}
-                    placeholder="Rua, Número, Bairro, Cidade - UF, CEP"
+                    placeholder="Rua, Número, Bairro, Cidade - UF, CEP (opcional)"
                     className={formStyles.input}
                   />
                 </div>
@@ -302,7 +301,7 @@ export const OwnersView: React.FC<OwnersViewProps> = ({
                     </div>
                     <div className="flex items-start gap-2 text-[#A7A7AB]">
                       <MapPin className="w-3.5 h-3.5 shrink-0 text-[#CAC9CA] mt-0.5" />
-                      <span className="leading-snug">{owner.endereco}</span>
+                      <span className="leading-snug">{owner.endereco || 'Endereço não informado'}</span>
                     </div>
                   </div>
                 </div>

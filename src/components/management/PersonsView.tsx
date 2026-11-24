@@ -234,10 +234,6 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
       return;
     }
     const cleanEndereco = sanitizeInputText(formEndereco);
-    if (!cleanEndereco) {
-      setFormError('Informe o endereço residencial da pessoa.');
-      return;
-    }
     if (formCep.trim() && !isValidCEP(formCep)) {
       setFormError('Informe um CEP válido com 8 dígitos.');
       return;
@@ -487,7 +483,9 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
                 <div>
                   <span className="text-[10px] text-neutral-500 block uppercase">Endereço Completo</span>
                   <strong className="text-white text-xs block mt-0.5">
-                    {selectedPersonForDetail.endereco}, {selectedPersonForDetail.cidade} - {selectedPersonForDetail.estado}
+                    {selectedPersonForDetail.endereco
+                      ? `${selectedPersonForDetail.endereco}, ${selectedPersonForDetail.cidade || 'Areial'} - ${selectedPersonForDetail.estado || 'PB'}`
+                      : 'Endereço não informado'}
                   </strong>
                   {selectedPersonForDetail.cep && (
                     <span className="text-[10px] text-neutral-400 font-mono">CEP: {selectedPersonForDetail.cep}</span>
@@ -711,14 +709,13 @@ export const PersonsView: React.FC<PersonsViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-neutral-400 font-semibold mb-1">Endereço Residencial *</label>
+                <label className="block text-neutral-400 font-semibold mb-1">Endereço Residencial (Opcional)</label>
                 <input
                   type="text"
-                  required
                   maxLength={200}
                   value={formEndereco}
                   onChange={(e) => setFormEndereco(e.target.value)}
-                  placeholder="Rua, número, bairro"
+                  placeholder="Rua, número, bairro (opcional)"
                   className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
                 />
               </div>

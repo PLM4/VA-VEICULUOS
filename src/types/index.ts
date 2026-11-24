@@ -10,7 +10,7 @@ export interface FormerOwner {
   cpf: string;
   rg?: string;
   telefone: string;
-  endereco: string;
+  endereco?: string;
   cidade?: string;
   estado?: string;
   cep?: string;

@@ -164,8 +164,8 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
     e.preventDefault();
 
     if (isCreatingNewOwner) {
-      if (!newOwner.nome.trim() || !newOwner.cpf.trim() || !newOwner.endereco.trim()) {
-        alert('Por favor preencha Nome/Razão Social, CPF/CNPJ e Endereço do antigo dono.');
+      if (!newOwner.nome.trim() || !newOwner.cpf.trim()) {
+        alert('Por favor preencha Nome/Razão Social e CPF/CNPJ do antigo dono.');
         return;
       }
       if (!isValidCPForCNPJ(newOwner.cpf)) {
@@ -504,14 +504,13 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
                 </div>
 
                 <div className="sm:col-span-3">
-                  <label className="text-xs text-neutral-400 block mb-1">Endereço Residencial *</label>
+                  <label className="text-xs text-neutral-400 block mb-1">Endereço Residencial (Opcional)</label>
                   <input
                     type="text"
-                    required
                     maxLength={200}
                     value={newOwner.endereco}
                     onChange={(e) => setNewOwner({ ...newOwner, endereco: e.target.value })}
-                    placeholder="Rua, número, bairro"
+                    placeholder="Rua, número, bairro (opcional)"
                     className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none"
                   />
                 </div>
