@@ -490,6 +490,7 @@ export function sanitizePublicVehicle(vehicle: Vehicle): Vehicle {
     renavam: '',
     categoriaComercial: vehicle.categoriaComercial,
     status: vehicle.status,
+    visivelVitrine: vehicle.visivelVitrine !== false,
     fotos: vehicle.fotos || [],
     antigoDonoId: '',
     dataEntrada: vehicle.dataEntrada,

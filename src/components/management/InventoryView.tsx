@@ -3,7 +3,8 @@ import {
   Car, Plus, Search, 
   Wrench, Calculator, ShoppingCart, FileText, 
   Trash2, DollarSign, LayoutGrid, List,
-  Bookmark, Clock, RotateCcw, X, Check
+  Bookmark, Clock, RotateCcw, X, Check,
+  Eye, EyeOff, Pencil
 } from 'lucide-react';
 import { Vehicle, FormerOwner, VehicleType, UserRole } from '../../types';
 import { 
@@ -19,6 +20,8 @@ interface InventoryViewProps {
   vehicles: Vehicle[];
   owners: FormerOwner[];
   onOpenEntryModal: () => void;
+  onEditVehicle?: (vehicle: Vehicle) => void;
+  onToggleVisibility?: (vehicle: Vehicle) => void;
   onOpenCostsModal: (vehicle: Vehicle) => void;
   onOpenSaleModal: (vehicle: Vehicle) => void;
   onOpenReceiptModal: (vehicle: Vehicle, owner?: FormerOwner) => void;
@@ -33,6 +36,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   vehicles,
   owners,
   onOpenEntryModal,
+  onEditVehicle,
+  onToggleVisibility,
   onOpenCostsModal,
   onOpenSaleModal,
   onOpenReceiptModal,
@@ -44,7 +49,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 }) => {
   const isGestor = userRole === 'gestor';
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
-  const [activeTab, setActiveTab] = useState<'todos' | 'em_estoque' | 'reservado' | 'vendido' | 'repasse'>('todos');
+  const [activeTab, setActiveTab] = useState<'todos' | 'em_estoque' | 'ocultos' | 'reservado' | 'vendido' | 'repasse'>('em_estoque');
   const [reservingVehicle, setReservingVehicle] = useState<Vehicle | null>(null);
   const [reserveCliente, setReserveCliente] = useState('');
   const [reserveDias, setReserveDias] = useState(2);
@@ -72,7 +77,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         (v.cadastradoPor || '').toLowerCase().includes(q);
 
       let matchesTab = true;
-      if (activeTab === 'em_estoque') matchesTab = v.status === 'em_estoque';
+      if (activeTab === 'em_estoque') matchesTab = v.status === 'em_estoque' && v.visivelVitrine !== false;
+      else if (activeTab === 'ocultos') matchesTab = v.status === 'em_estoque' && v.visivelVitrine === false;
       else if (activeTab === 'reservado') matchesTab = v.status === 'reservado';
       else if (activeTab === 'vendido') matchesTab = v.status === 'vendido';
       else if (activeTab === 'repasse') matchesTab = v.categoriaComercial === 'repasse';
@@ -105,7 +111,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   }, [vehicles]);
 
   const tabs = [
-    { id: 'em_estoque', label: 'Em Estoque', count: vehicles.filter(v => v.status === 'em_estoque').length },
+    { id: 'em_estoque', label: 'Em Estoque', count: vehicles.filter(v => v.status === 'em_estoque' && v.visivelVitrine !== false).length },
+    { id: 'ocultos', label: 'Ocultos (Preparação)', count: vehicles.filter(v => v.status === 'em_estoque' && v.visivelVitrine === false).length },
     { id: 'reservado', label: 'Reservados', count: vehicles.filter(v => v.status === 'reservado').length },
     { id: 'todos', label: 'Todos os Registros', count: vehicles.length },
     { id: 'repasse', label: 'Repasse (No Estado)', count: vehicles.filter(v => v.categoriaComercial === 'repasse').length },
@@ -320,9 +327,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                       {/* Status Atual */}
                       <td className="py-3 px-4">
-                        <StatusBadge
-                          status={v.status}
-                        />
+                        <div className="flex flex-col items-start gap-1">
+                          <StatusBadge
+                            status={v.status}
+                          />
+                          {v.status === 'em_estoque' && v.visivelVitrine === false && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                              <EyeOff className="w-3 h-3" /> Oculto da Vitrine
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {isGestor && (
@@ -366,6 +380,32 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       {/* Ações */}
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          {/* Editar Cadastro e Fotos (Exclusivo Gestor, veículos não vendidos) */}
+                          {isGestor && v.status !== 'vendido' && onEditVehicle && (
+                            <button
+                              onClick={() => onEditVehicle(v)}
+                              className="p-1.5 rounded-[6px] bg-[#202024] hover:bg-[#2D2D32] text-sky-400 hover:text-sky-300 border border-[#2D2D32] transition-colors cursor-pointer"
+                              title="Editar Dados e Fotos do Veículo"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {/* Ocultar ou Expor no Estoque/Vitrine (Exclusivo Gestor, se em estoque) */}
+                          {isGestor && v.status === 'em_estoque' && onToggleVisibility && (
+                            <button
+                              onClick={() => onToggleVisibility(v)}
+                              className={`p-1.5 rounded-[6px] border transition-colors cursor-pointer ${
+                                v.visivelVitrine === false
+                                  ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border-emerald-500/30'
+                                  : 'bg-[#202024] hover:bg-[#2D2D32] text-amber-400 border-[#2D2D32]'
+                              }`}
+                              title={v.visivelVitrine === false ? 'Expor no Estoque e Vitrine Pública' : 'Ocultar da Vitrine (Mover para Preparação)'}
+                            >
+                              {v.visivelVitrine === false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                            </button>
+                          )}
+
                           {/* Custos e Simulador (Exclusivo Gestor) */}
                           {isGestor && (
                             <button
@@ -479,9 +519,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       alt={v.modelo}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute top-3 left-3 flex gap-1.5">
+                    <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
                       <StatusBadge status={v.status} />
                       <StatusBadge status={v.categoriaComercial === 'repasse' ? 'repasse' : 'garantia'} />
+                      {v.status === 'em_estoque' && v.visivelVitrine === false && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/90 text-black shadow-sm">
+                          <EyeOff className="w-3 h-3" /> Oculto
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -536,6 +581,28 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <div className="flex items-center gap-1.5">
                     {isGestor && (
                       <>
+                        {v.status !== 'vendido' && onEditVehicle && (
+                          <button
+                            onClick={() => onEditVehicle(v)}
+                            className="p-1.5 rounded-[6px] bg-[#17171A] hover:bg-[#2D2D32] border border-[#2D2D32] text-sky-400 cursor-pointer"
+                            title="Editar Dados e Fotos"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {v.status === 'em_estoque' && onToggleVisibility && (
+                          <button
+                            onClick={() => onToggleVisibility(v)}
+                            className={`p-1.5 rounded-[6px] border cursor-pointer ${
+                              v.visivelVitrine === false
+                                ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30 text-emerald-400'
+                                : 'bg-[#17171A] hover:bg-[#2D2D32] border-[#2D2D32] text-amber-400'
+                            }`}
+                            title={v.visivelVitrine === false ? 'Expor no Estoque e Vitrine' : 'Ocultar da Vitrine (Preparação)'}
+                          >
+                            {v.visivelVitrine === false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
                         <button
                           onClick={() => onOpenCostsModal(v)}
                           className="p-1.5 rounded-[6px] bg-[#17171A] hover:bg-[#2D2D32] border border-[#2D2D32] text-[#CAC9CA] cursor-pointer"

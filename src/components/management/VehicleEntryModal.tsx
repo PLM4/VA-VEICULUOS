@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, UserPlus, Car, DollarSign, 
   Plus, Check, 
-  Upload, Trash2
+  Upload, Trash2, Eye, EyeOff, Pencil
 } from 'lucide-react';
 import { 
   Vehicle, FormerOwner, VehicleType, CommercialCategory, 
@@ -28,6 +28,7 @@ interface VehicleEntryModalProps {
   store?: StoreProfile;
   onOpenReceipt: (vehicle: Vehicle, owner: FormerOwner) => void;
   vehicles?: Vehicle[];
+  editingVehicle?: Vehicle | null;
 }
 
 export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
@@ -38,8 +39,10 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
   onSaveVehicle,
   templates,
   onOpenReceipt,
-  vehicles = []
+  vehicles = [],
+  editingVehicle = null
 }) => {
+  const isEditMode = Boolean(editingVehicle);
   // Step 1: Owner selection/creation
   const [selectedOwnerId, setSelectedOwnerId] = useState<string>(owners[0]?.id || '');
   const [isCreatingNewOwner, setIsCreatingNewOwner] = useState(false);
@@ -87,11 +90,14 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
     return Array.from(map.entries()).map(([nome, telefone]) => ({ nome, telefone }));
   }, [vehicles]);
   
-  // Fotos (upload até 10 fotos)
+  // Fotos (upload até 10 fotos - opcional ao salvar em preparação)
   const DEFAULT_PLACEHOLDER_PHOTO = 'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=1200&q=80';
   const [fotoUrl, setFotoUrl] = useState('');
-  const [fotosList, setFotosList] = useState<string[]>([DEFAULT_PLACEHOLDER_PHOTO]);
+  const [fotosList, setFotosList] = useState<string[]>([]);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+
+  // Visibilidade no Estoque / Vitrine Pública
+  const [visivelVitrine, setVisivelVitrine] = useState<boolean>(true);
 
   // Step 3: Financials & DETRAN (com máscaras R$)
   const [valorPagoStr, setValorPagoStr] = useState('R$ 85.000,00');
@@ -104,6 +110,79 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
   const [modeloReciboId, setModeloReciboId] = useState<string>(
     templates.find(t => t.tipo === 'recibo_compra')?.id || 'recibo_compra_veiculo'
   );
+
+  // Preenche o formulário automaticamente no modo de edição ou reseta para novo cadastro
+  useEffect(() => {
+    if (!isOpen) return;
+    if (editingVehicle) {
+      setSelectedOwnerId(editingVehicle.antigoDonoId || owners[0]?.id || '');
+      setIsCreatingNewOwner(false);
+      setTipo(editingVehicle.tipo || 'carro');
+      setMarca(editingVehicle.marca || '');
+      setModelo(editingVehicle.modelo || '');
+      setVersao(editingVehicle.versao || '');
+      setAnoFabricacao(editingVehicle.anoFabricacao || new Date().getFullYear());
+      setAnoModelo(editingVehicle.anoModelo || new Date().getFullYear());
+      setCor(editingVehicle.cor || '');
+      setCombustivel(editingVehicle.combustivel || 'Flex');
+      setCambio(editingVehicle.cambio || 'Automático');
+      setQuilometragem(editingVehicle.quilometragem ?? 0);
+      setPlaca(editingVehicle.placa || '');
+      setChassi(editingVehicle.chassi || '');
+      setRenavam(editingVehicle.renavam || '');
+      setResponsavelVeiculo(editingVehicle.responsavelVeiculo || editingVehicle.cadastradoPor || '');
+      setResponsavelTelefone(editingVehicle.responsavelTelefone || '');
+      setIsAddingNewPartner(false);
+      setFotosList(Array.isArray(editingVehicle.fotos) ? editingVehicle.fotos : []);
+      setFotoUrl('');
+      setVisivelVitrine(editingVehicle.visivelVitrine !== false);
+      setValorPagoStr(formatCurrency(editingVehicle.valorPago || 0));
+      setCategoriaComercial(editingVehicle.categoriaComercial || 'venda');
+      const hasDebt = Boolean(editingVehicle.debitoDetran?.temDebito);
+      setTemDebito(hasDebt);
+      setValorDebitoStr(formatCurrency(hasDebt ? (editingVehicle.debitoDetran?.valor || 0) : 0));
+      setQuemArcaDebito(editingVehicle.debitoDetran?.quemArca === 'antigo_dono' ? 'antigo_dono' : 'loja');
+      setDescricaoDebito(editingVehicle.debitoDetran?.descricao || 'IPVA e licenciamento em aberto');
+      setValorAnunciadoStr(formatCurrency(editingVehicle.valorAnunciado || 0));
+      setModeloReciboId(
+        editingVehicle.modeloReciboCompraId ||
+        templates.find(t => t.tipo === 'recibo_compra')?.id ||
+        'recibo_compra_veiculo'
+      );
+    } else {
+      setSelectedOwnerId(owners[0]?.id || '');
+      setIsCreatingNewOwner(false);
+      setTipo('carro');
+      setMarca('Toyota');
+      setModelo('');
+      setVersao('');
+      setAnoFabricacao(new Date().getFullYear());
+      setAnoModelo(new Date().getFullYear());
+      setCor('Preto');
+      setCombustivel('Flex');
+      setCambio('Automático');
+      setQuilometragem(35000);
+      setPlaca('');
+      setChassi('');
+      setRenavam('');
+      setResponsavelVeiculo('');
+      setResponsavelTelefone('');
+      setIsAddingNewPartner(false);
+      setFotosList([]);
+      setFotoUrl('');
+      setVisivelVitrine(true);
+      setValorPagoStr('R$ 85.000,00');
+      setCategoriaComercial('venda');
+      setTemDebito(false);
+      setValorDebitoStr('R$ 1.200,00');
+      setQuemArcaDebito('loja');
+      setDescricaoDebito('IPVA e licenciamento em aberto');
+      setValorAnunciadoStr('R$ 98.900,00');
+      setModeloReciboId(
+        templates.find(t => t.tipo === 'recibo_compra')?.id || 'recibo_compra_veiculo'
+      );
+    }
+  }, [isOpen, editingVehicle]);
 
   if (!isOpen) return null;
 
@@ -243,7 +322,7 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
 
     const cleanInputPlate = normalizePlate(placa);
     const isDuplicatePlate = (vehicles || []).some(
-      v => v.status === 'em_estoque' && normalizePlate(v.placa) === cleanInputPlate
+      v => v.id !== editingVehicle?.id && v.status === 'em_estoque' && normalizePlate(v.placa) === cleanInputPlate
     );
 
     if (isDuplicatePlate) {
@@ -310,7 +389,8 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
     const generatedFallbackVin = `9BR${String(Date.now()).padStart(13, '0').slice(-13)}X`;
 
     const newVehicle: Vehicle = {
-      id: 'veh_' + Date.now(),
+      ...(editingVehicle ? editingVehicle : {}),
+      id: editingVehicle ? editingVehicle.id : 'veh_' + Date.now(),
       tipo,
       marca: marca.trim(),
       modelo: modelo.trim(),
@@ -322,19 +402,20 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
       cambio,
       quilometragem: Math.min(2_000_000, Math.max(0, Math.round(Number(quilometragem)))),
       placa: maskPlate(placa),
-      chassi: maskChassi(chassi) || generatedFallbackVin,
-      renavam: maskRenavam(renavam) || `00${Math.floor(100000000 + Math.random() * 900000000)}`,
+      chassi: maskChassi(chassi) || editingVehicle?.chassi || generatedFallbackVin,
+      renavam: maskRenavam(renavam) || editingVehicle?.renavam || `00${Math.floor(100000000 + Math.random() * 900000000)}`,
       categoriaComercial,
-      status: 'em_estoque',
-      fotos: fotosList.length > 0 ? fotosList : ['https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=1200&q=80'],
+      status: editingVehicle ? editingVehicle.status : 'em_estoque',
+      visivelVitrine,
+      fotos: fotosList,
       antigoDonoId: ownerToUse.id,
-      dataEntrada: new Date().toISOString(),
-      cadastradoPor: responsavelVeiculo.trim() || 'Gestor Geral',
+      dataEntrada: editingVehicle ? editingVehicle.dataEntrada : new Date().toISOString(),
+      cadastradoPor: responsavelVeiculo.trim() || editingVehicle?.cadastradoPor || 'Gestor Geral',
       responsavelVeiculo: responsavelVeiculo.trim(),
       responsavelTelefone: responsavelTelefone.trim() ? maskPhone(responsavelTelefone) : undefined,
       valorPago: valorPagoNum,
       debitoDetran: debitoData,
-      reciboCompraGerado: true,
+      reciboCompraGerado: editingVehicle ? editingVehicle.reciboCompraGerado : true,
       modeloReciboCompraId: modeloReciboId,
       valorAnunciado: valorAnunciadoNum,
       descricaoDestaques: [
@@ -342,7 +423,7 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
         'Veículo vistoriado e periciado em Areial-PB',
         `${cambio} • ${combustivel}`
       ],
-      custosPatio: []
+      custosPatio: editingVehicle ? (editingVehicle.custosPatio || []) : []
     };
 
     try {
@@ -352,8 +433,10 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
     }
     onClose();
 
-    // Trigger purchase receipt immediately so store can print for the seller
-    onOpenReceipt(newVehicle, ownerToUse);
+    // Emite recibo de compra automaticamente apenas na entrada de novos veículos
+    if (!isEditMode) {
+      onOpenReceipt(newVehicle, ownerToUse);
+    }
   };
 
   return (
@@ -364,14 +447,16 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
         <div className="px-6 py-4 border-b border-[#2D2D32] flex items-center justify-between bg-[#080809]">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-[8px] bg-[#D4130D] flex items-center justify-center text-white font-bold shadow-sm">
-              <Plus className="w-5 h-5 stroke-[2.5]" />
+              {isEditMode ? <Pencil className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-5 h-5 stroke-[2.5]" />}
             </div>
             <div>
               <h3 className="text-base font-bold text-[#F5F5F5] font-display">
-                Entrada & Cadastro de Novo Veículo
+                {isEditMode ? 'Editar Cadastro do Veículo' : 'Entrada & Cadastro de Novo Veículo'}
               </h3>
               <p className="text-xs text-[#A7A7AB]">
-                Atribuição de antigo dono, fotos com compressão, débitos DETRAN e emissão de recibo de compra.
+                {isEditMode
+                  ? 'Atualize informações, fotos, valores ou visibilidade na vitrine sem precisar recadastrar.'
+                  : 'Atribuição de antigo dono, fotos opcionais, débitos DETRAN e controle de visibilidade na vitrine.'}
               </p>
             </div>
           </div>
@@ -846,24 +931,30 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
               </div>
 
               {/* Galeria de Miniaturas (até 10 fotos) */}
-              <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 pt-2">
-                {fotosList.map((url, idx) => (
-                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-neutral-700 group bg-neutral-900">
-                    <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    <span className="absolute bottom-0.5 left-1 text-[9px] font-bold text-white bg-black/70 px-1 rounded">
-                      #{idx + 1}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemovePhoto(idx)}
-                      className="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                      title="Remover foto"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              {fotosList.length === 0 ? (
+                <div className="p-3 rounded-xl border border-dashed border-neutral-800 bg-neutral-900/50 text-[11px] text-neutral-400 text-center">
+                  Nenhuma foto adicionada ainda (opcional). Você pode salvar o veículo oculto/em preparação e adicionar as fotos depois clicando em <strong className="text-neutral-200">Editar</strong>.
+                </div>
+              ) : (
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 pt-2">
+                  {fotosList.map((url, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-neutral-700 group bg-neutral-900">
+                      <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <span className="absolute bottom-0.5 left-1 text-[9px] font-bold text-white bg-black/70 px-1 rounded">
+                        #{idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(idx)}
+                        className="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        title="Remover foto"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1015,6 +1106,50 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
               </select>
             </div>
 
+            {/* Visibilidade no Estoque Ativo e Vitrine Pública */}
+            <div className="pt-3 border-t border-neutral-800 space-y-2.5">
+              <label className="text-xs font-bold text-white uppercase tracking-wider block">
+                Visibilidade no Estoque & Vitrine Pública
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setVisivelVitrine(true)}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                    visivelVitrine
+                      ? 'bg-emerald-500/10 border-emerald-500/60 text-white'
+                      : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                  }`}
+                >
+                  <Eye className={`w-4 h-4 mt-0.5 shrink-0 ${visivelVitrine ? 'text-emerald-400' : 'text-neutral-500'}`} />
+                  <div>
+                    <span className="text-xs font-bold block">Expor no Estoque e Vitrine</span>
+                    <span className="text-[11px] text-neutral-400 block mt-0.5">
+                      Pronto para venda: aparece na aba Em Estoque e no site público.
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setVisivelVitrine(false)}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                    !visivelVitrine
+                      ? 'bg-amber-500/10 border-amber-500/60 text-white'
+                      : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                  }`}
+                >
+                  <EyeOff className={`w-4 h-4 mt-0.5 shrink-0 ${!visivelVitrine ? 'text-amber-400' : 'text-neutral-500'}`} />
+                  <div>
+                    <span className="text-xs font-bold block">Manter Oculto (Em Preparação)</span>
+                    <span className="text-[11px] text-neutral-400 block mt-0.5">
+                      Fica salvo na aba Ocultos até lavar, fotografar e liberar para venda.
+                    </span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
           </div>
 
           {/* Footer Actions */}
@@ -1031,7 +1166,11 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
               className="px-5 py-2.5 rounded-[8px] bg-[#D4130D] hover:bg-[#E3271F] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer"
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
-              Finalizar Entrada & Emitir Recibo de Compra
+              {isEditMode
+                ? 'Salvar Alterações do Veículo'
+                : visivelVitrine
+                  ? 'Finalizar Entrada & Emitir Recibo de Compra'
+                  : 'Salvar Oculto (Em Preparação)'}
             </button>
           </div>
 

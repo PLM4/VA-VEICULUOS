@@ -63,6 +63,7 @@ export interface Vehicle {
   renavam: string;
   categoriaComercial: CommercialCategory;
   status: VehicleStatus;
+  visivelVitrine?: boolean; // false = oculto / em preparação (não aparece na vitrine nem na aba ativa do estoque)
   
   // Imagens (até 10 fotos)
   fotos: string[];

@@ -67,9 +67,9 @@ export const ShowroomView: React.FC<ShowroomViewProps> = ({
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  // Filtrar apenas veículos com status "em_estoque" para a vitrine
+  // Filtrar apenas veículos com status "em_estoque" e visíveis na vitrine (exclui ocultos/em preparação)
   const inStockVehicles = useMemo(() => {
-    return vehicles.filter(v => v.status === 'em_estoque');
+    return vehicles.filter(v => v.status === 'em_estoque' && v.visivelVitrine !== false);
   }, [vehicles]);
 
   // Estatísticas Dinâmicas para os Filtros

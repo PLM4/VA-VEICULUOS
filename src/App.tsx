@@ -116,6 +116,7 @@ export default function App() {
 
   // Modals state
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [vehicleForCosts, setVehicleForCosts] = useState<Vehicle | null>(null);
   const [vehicleForSale, setVehicleForSale] = useState<Vehicle | null>(null);
 
@@ -336,7 +337,27 @@ export default function App() {
   // Handlers com blindagem RBAC
   const handleOpenEntryModal = () => {
     if (userRole !== 'gestor') return;
+    setEditingVehicle(null);
     setIsEntryModalOpen(true);
+  };
+
+  const handleOpenEditVehicle = (v: Vehicle) => {
+    if (userRole !== 'gestor') return;
+    const latest = storageService.getVehicles().find(item => item.id === v.id) || v;
+    setEditingVehicle(latest);
+    setIsEntryModalOpen(true);
+  };
+
+  const handleToggleVehicleVisibility = (v: Vehicle) => {
+    if (userRole !== 'gestor') return;
+    const latest = storageService.getVehicles().find(item => item.id === v.id) || v;
+    const nextVisible = latest.visivelVitrine === false ? true : false;
+    try {
+      storageService.saveVehicle({ ...latest, visivelVitrine: nextVisible }, activeUserName);
+      refreshData(true, userRole);
+    } catch (err) {
+      console.warn('Erro ao alternar visibilidade do veículo:', err);
+    }
   };
 
   const handleSaveVehicle = (newVehicle: Vehicle) => {
@@ -773,6 +794,8 @@ export default function App() {
                   userRole={userRole}
                   initialSearchTerm={managementTab === 'inventory' ? activeSearchFilter : ''}
                   onOpenEntryModal={handleOpenEntryModal}
+                  onEditVehicle={handleOpenEditVehicle}
+                  onToggleVisibility={handleToggleVehicleVisibility}
                   onOpenCostsModal={handleOpenCostsModal}
                   onOpenSaleModal={handleOpenSaleModal}
                   onOpenReceiptModal={handleOpenPurchaseReceipt}
@@ -989,11 +1012,14 @@ export default function App() {
         />
       )}
 
-      {/* MODAL 1: Intake Wizard (Vehicle Entry & Former Owner) — exclusivo do Gestor */}
+      {/* MODAL 1: Intake & Edit Wizard (Vehicle Entry & Former Owner) — exclusivo do Gestor */}
       {isEntryModalOpen && isStaffAuthenticated && userRole === 'gestor' && (
         <VehicleEntryModal
           isOpen={isEntryModalOpen}
-          onClose={() => setIsEntryModalOpen(false)}
+          onClose={() => {
+            setIsEntryModalOpen(false);
+            setEditingVehicle(null);
+          }}
           owners={owners}
           onSaveOwner={handleSaveOwner}
           onSaveVehicle={handleSaveVehicle}
@@ -1001,6 +1027,7 @@ export default function App() {
           store={store}
           onOpenReceipt={handleOpenPurchaseReceipt}
           vehicles={vehicles}
+          editingVehicle={editingVehicle}
         />
       )}
 
